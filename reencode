@@ -1,0 +1,154 @@
+#!/bin/bash
+# A trivial MP3 Reencoder
+# Copyright (C) 2005 Eskild Hustvedt
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+TARGETDIR=""
+NOREMOVE="0"
+IFEXIST_KEEP="0"
+VERSION="0.1"
+DEFAULT_BITRATE="128"
+BITRATE=""
+echo ""
+echo "ZD MP3 Reencode version $VERSION"
+# Help screen
+DisplayHelp () {
+	echo "Reencodes mp3 files."
+	echo ""
+	echo "-t, --targetdir		Put converted files into target directory rather than"
+	echo "			overwriting the old one."
+	echo "-n, --noremove		Save files with a .mp3new prefix instead of overwriting"
+	echo "			the old one."
+	echo "			(if a file with a .mp3new prefix already exists, it"
+	echo "			 will be overwritten!)"
+	echo "-e, --noremoveexist	Don't convert if target file already exists"
+	echo "			(requires --targetdir)"
+	echo "-b, --bitrate		Reencode to the supplied bitrate (default: $DEFAULT_BITRATE)"
+	echo "-h, --help		Display this help screen"
+}
+# The function that calls lame to do the actual encoding
+DoEncode ()
+{
+	# A function that gets ID3 tags from files
+	GetInfo ()
+	{
+		# The function that actually does the id3 extracting.
+		GetInfo_real () {
+			shift 1
+			case $1 in
+				TIT2|TALB|TCON|TPE1 ) shift 3;;
+				TRCK ) shift 5;;
+				TYER ) shift 2;;
+				* ) shift 2 ;;
+			esac
+			echo "$@"|sed -e s,"'","",g|sed -e s,'\\','',g
+		}
+		local info="`echo "$id3info"|grep -i $1`"
+		echo "`GetInfo_real $info`"
+	}
+	# Get the id3 infomration and convert
+	if type id3info &>/dev/null && type sed &>/dev/null; then
+		id3info="`id3info $1`"
+		TITLE="`GetInfo TIT2`"
+		ARTIST="`GetInfo TPE1`"
+		ALBUM="`GetInfo TALB`"
+		YEAR="`GetInfo TYER`"
+		GENRE="`GetInfo TCON|sed -e s,'(','',g |sed -e s,')','',g`"
+		TRACK="`GetInfo TRCK`"
+		lame -b $BITRATE --ignore-tag-errors --ty "$YEAR" --tt "$TITLE" --ta "$ARTIST" --tl "$ALBUM" --tg "$GENRE" --tn "$TRACK" "$1"
+		ret="$?"
+	else
+		# Don't have id3info :( - just tell lame to convert
+		lame -b $BITRATE "$1"
+		ret="$?"
+	fi
+	if [ -e "$1.mp3" ]; then
+		mv -f "$1.mp3" "$1"
+	fi
+	# If lame returned nonzero allow the user 2 seconds to ctrl+c me
+	if [ "$ret" != "0" ]; then
+		echo -ne "\rlame returned nonzero ($ret) waiting 2 seconds before continuing!";
+		sleep 1s
+		echo -ne "\rlame returned nonzero ($ret) waiting 1 second before continuing! ";
+		sleep 1s
+		echo -e "\rlame returned nonzero ($ret)!                                        "
+	fi
+}
+# Test for some required/recommended components
+if ! type lame &>/dev/null; then
+	echo "I need \"lame\" to work! Please install it, then re-run me."
+	exit 1
+fi
+if ! type id3info &>/dev/null; then
+	echo "I need \"id3info\" to be able to extract ID3 tags. Without this installed ID3 tags might be lost."
+fi
+if ! type sed &>/dev/null; then
+	echo "I need \"sed\" to be able to parse ID3 tags. Without this installed ID3 tags might be lost."
+fi
+# Parse commandline options
+if [ "$#" == "0" ]; then DisplayHelp;exit 0;fi
+while [ "$#" -gt "0" ]; do
+	case $1 in
+		-t | --targetdir ) TARGETDIR="$2";echo "Target directory is $TARGETDIR";shift 2;;
+		-n | --noremove ) NOREMOVE="1";shift 1;;
+		-e | --noremoveexist ) IFEXIST_KEEP="1";shift 1;;
+		-h | --help ) DisplayHelp; exit 0;;
+		-v | --version ) exit 0;;
+		-b | --bitrate ) if [ "$2" == "" ]; then echo "--bitrate requires an additional option: The bitrate to use"
+		echo "It can be either 32, 40, 48, 56, 64, 80, 96, 112, 128, 160,  192,  224,  256, 320"
+		echo "Default is $DEFAULT_BITRATE";
+	else BITRATE="$2";shift 2;fi;;
+		# Stop processing here
+		* ) break;;
+	esac
+done
+# Check for components
+if ! type lame &>/dev/null; then
+	echo "I need \"lame\" to work! Please install it, then re-run me."
+	exit 1
+fi
+if [ "$BITRATE" == "" ]; then BITRATE="$DEFAULT_BITRATE";fi
+echo "Files to convert: $#"
+# Do the convertion
+for a in "$@"; do
+	echo ""
+	BASENAME="`basename $a`"
+	TMPFILE="/tmp/$BASENAME.`whoami`.mp3new"
+	if [ ! -e $a ]; then
+		echo "$a: no such file."
+	elif [ "$TARGETDIR" != "" ]; then
+		if [ "$IFEXIST_KEEP" ] && [ -e $TARGETDIR/$BASENAME ]; then
+			echo "$TARGETDIR/$BASENAME existed! Skipping."
+		elif [ "$NOREMOVE" == "1" ] && [ -e "$TARGETDIR/$BASENAME" ]; then
+			DoEncode "$a" "$TARGETDIR/$BASENAME.mp3new"
+			echo "";echo "Wrote file: $TARGETDIR/$BASENAME.mp3new"
+		else
+			DoEncode "$a" "$TARGETDIR/$BASENAME"
+			echo "";echo "Wrote file: $TARGETDIR/$BASENAME"
+		fi
+	elif [ "$NOREMOVE" == "1" ]; then
+		DoEncode "$a" "$TMPFILE"
+		if [ -e $TMPFILE ]; then
+			mv -f "$TMPFILE" "$a.mp3new"
+			echo "";echo "Wrote file: $a.mp3new"
+		fi
+	else
+		DoEncode "$a" "$TMPFILE"
+		if [ -e $TMPFILE ]; then
+			mv -f $TMPFILE $a
+			echo "";echo "Wrote file: $a"
+		fi
+	fi
+done
