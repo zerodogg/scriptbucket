@@ -1,0 +1,77 @@
+#!/bin/bash
+# Copyright (C) Eskild Hustvedt 2010
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+cache="-cache 8192"
+LASTF="/dev/shm/dagsnytt.last"
+mode="dagsnytt"
+file=""
+app="$(basename $0)"
+TERM_OUTSTRING="$app"
+case $TERM in
+	# Screen
+	*screen* )
+	echo -ne "\033k$TERM_OUTSTRING\033\\";;
+	xterm*|rxvt*|terminal* )
+	echo -ne "\033]0;$TERM_OUTSTRING\007";;
+esac
+if [ "$(date +%u)" -lt "6" ] && [ "$DAGSNYTT_ALT_FORCE" != "1" ]; then
+	echo -n "Fetching RSS..."
+	RSS="http://podkast.nrk.no/program/dagsnytt.rss"
+	if [ "$app" == "politiskkvarter" ]; then
+		RSS="http://podkast.nrk.no/program/politisk_kvarter.rss"
+		LASTF="$LASTF.politiskkvarter"
+	fi
+	file="$(curl -s "$RSS" | perl -n -e 's/\r//g;$hasItem = 1 if /<item>/; $hasItem = 0 if m{</item>}; chomp if $hasItem; s/ +/ /g; print $_'|\grep -vi nyhetsmorgen |\grep \.mp3|perl -pi -e 's#.*url="([^"]+)".*#$1#; s#\&amp;#\&#g;'|head -n1)"
+	echo "done"
+elif [ "$app" != "dagsnytt" ]; then
+	echo "Nothing to do."
+	exit 0
+else
+	# Fallback for weekends when there is no NRK podcast available
+	echo "Dagsnytt not available, trying P4 instead..."
+	cache="-cache-min 35"
+	mode="fallback"
+	echo -n "Fetching URL..."
+	base="$( curl -s 'http://www.p4.no/player/player.aspx?channel=&type=nyheter'|grep -i 'player/play.aspx'|perl -pi -e "s#.*(/player/play.aspx[^']+).*#\$1#g" )"
+	if [ "$base" != "" ]; then
+		file="$( curl -s "http://www.p4.no/$base" | perl -pi -e 's#.*href="([^"]+)".*#$1#' )"
+	fi
+	echo "done"
+fi
+if [ "$file" == "" ]; then
+	echo "Found nothing"
+	exit 0
+elif [ "$1" != "force" ] && [ -e "$LASTF" ] && [ "$(cat "$LASTF"|perl -pi -e 'chomp;')" == "$file" ]; then
+	echo "Nothing new."
+	echo "Run \"$0 force\" to re-play the last one"
+	exit 0
+elif [ "$mode" == "dagsnytt" ] && [ "$(echo "$file" |grep `date +%Y-%m%d`)" == "" ]; then
+	echo "File appears to be too old."
+	echo "Was: $file"
+	echo "Expected it to include the string `date +%Y-%m%d`"
+	exit 1
+fi
+START=$SECONDS
+mplayer $cache "$file"
+ret=$?
+if [ "$ret" != "0" ]; then
+	exit $ret
+fi
+let MIN=$SECONDS+120
+if [ "$SECONDS" -lt "$MIN" ]; then
+	exit 0
+fi
+echo "$file" > "$LASTF"
+exit 0

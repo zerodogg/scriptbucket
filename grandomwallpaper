@@ -1,0 +1,781 @@
+#!/usr/bin/perl
+# grandomwallpaper
+# Nautilus wallpaper randomizer
+# Copyright (C) Eskild Hustvedt 2008
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use Getopt::Long;
+use constant {
+	true => 1,
+	false => undef,
+};
+my $Version = 0.1;
+my $WPDir;
+my $GrandomCurrImgFile = $ENV{HOME}.'/.grandomwallpaper.currimg';
+my $GrandomHitListFile = $ENV{HOME}.'/.grandomwallpaper.hitlist';
+my $GrandomBlacklistFile = $ENV{HOME}.'/.grandomwallpaper.blacklist';
+my $GrandomLockFile = $ENV{HOME}.'/.grandomwallpaper.lockfile';
+my $verbose = false;
+
+my @FileList;
+# The hitlist
+my %HitList;
+# The blacklist
+my %BlackList;
+# The list of new files
+my %NewFiles;
+
+# Purpose: Print verbose information
+# Usage: printv(info);
+sub printv
+{
+	if ($verbose)
+	{
+		print " grandomwallpaper: ".$_[0]."\n";
+	}
+}
+
+# Purpose: Refuse to start if the lockfile tells us not to
+#			Note, this is assumes Linux-style /proc
+# Usage: LockCheck();
+sub LockCheck
+{
+	# Ignore the lock system entirely if /proc/ isn't "Linux-style"
+	if (not -d '/proc/'.$$ or not -d '/proc/'.$$.'/cmdline')
+	{
+		return true;
+	}
+	if (-e $GrandomLockFile)
+	{
+		open(my $l, '<',$GrandomLockFile) or return;
+		my $PID = <$l>;
+		close($l);
+		chomp($PID);
+		if(not length($PID))
+		{
+			WriteLockFile();
+			return;
+		}
+		if ($PID == $$)
+		{
+			WriteLockFile();
+			return;
+		}
+		if(not -d '/proc/'.$PID)
+		{
+			WriteLockFile();
+			return;
+		}
+		if(not -r '/proc/'.$PID.'/cmdline')
+		{
+			WriteLockFile();
+			return;
+		}
+		open(my $cmd,'<','/proc/'.$PID.'/cmdline') or return;
+		my $cmdline = <$cmd>;
+		close($cmd);
+		if ($cmdline =~ /grandomwallpaper/)
+		{
+			print "Refusing to go into daemon mode, daemon ".$PID." is already running\n";
+			print "Kill ".$PID." first if you want to start a new one\n";
+			exit(0);
+		}
+	}
+	WriteLockFile();
+}
+
+# Purpose: Write the PID lockfile
+# Usage: WriteLockFile();
+sub WriteLockFile
+{
+	open(my $lf, '>',$GrandomLockFile);
+	print $lf $$;
+	close($lf);
+}
+
+# Purpose: Check if a file is in the blacklist
+# Usage: bool = isBlackListed(file);
+#	Returns true if it is blacklisted
+sub isBlackListed
+{
+	my $file = shift;
+	if(defined $BlackList{$file})
+	{
+		return true;
+	}
+	$file =~ s{/+}{/}g;
+	$file =~ s/^\s+//g;
+	$file =~ s/\s+$//g;
+	if(defined $BlackList{$file})
+	{
+		return true;
+	}
+	return false;
+}
+
+# Purpose: Load the blacklist
+# Usage: BlacklistLoader();
+sub BlacklistLoader
+{
+	if (not -r $GrandomBlacklistFile)
+	{
+		return;
+	}
+	open(my $blacklist, '<',$GrandomBlacklistFile);
+	while(my $line = <$blacklist>)
+	{
+		chomp($line);
+		next if $line =~ /^\s*#/;
+		next if not $line =~ /\S/;
+		$line =~ s{/+}{/}g;
+		$line =~ s/^\s+//g;
+		$line =~ s/\s+$//g;
+		$BlackList{$line} = true;
+	}
+}
+
+# Purpose: Write the blacklist
+# Usage: BlacklistWriter();
+sub BlacklistWriter 
+{
+	open(my $blacklist, '>',$GrandomBlacklistFile);
+	print $blacklist "# GRandomWallpaper blacklist file\n# One blacklisted image file per line\n";
+	foreach my $file (sort keys(%BlackList))
+	{
+		print $blacklist $file."\n";
+	}
+	close($blacklist);
+}
+
+# Purpose: Load the hitlist
+# Usage: HitlistLoader();
+sub HitlistLoader
+{
+	printv("Loading hitlist");
+	my $max = 0;
+	my $min = 99;
+	return if not -r $GrandomHitListFile;
+	open(my $hitlist, '<',$GrandomHitListFile);
+	while(my $line = <$hitlist>)
+	{
+		chomp($line);
+		next if not $line =~ /\S/;
+		next if $line =~ /^\s*#/;
+		my $file = $line;
+		my $hits = $line;
+		$file =~ s/\s+\d+$//;
+		$hits =~ s/^.+\s+(\d+)$/$1/;
+		if(length($file) && length($hits) && $file =~ /\S/ && $hits =~ /\d+/)
+		{
+			$HitList{$file} = $hits;
+			if ($max < $hits)
+			{
+				$max = $hits;
+			}
+			if ($min > $hits)
+			{
+				$min = $hits;
+			}
+		}
+		else
+		{
+			print "Warning: Failure to parse line: $line\n";
+			next;
+		}
+	}
+	if ($min == 99)
+	{
+		$min = 0;
+	}
+	printv("max = $max");
+	printv("min = $min");
+	$HitList{'max'} = $max;
+	$HitList{'min'} = $min;
+}
+
+# Purpose: Write the hitlist
+# Usage: HitlistWriter();
+sub HitlistWriter
+{
+	open(my $hitlist, '>',$GrandomHitListFile);
+	print $hitlist "# GRandomWallpaper hitlist file\n# Syntax: file [hits]\n# You shouldn't edit this file by hand\n# Last written: ".scalar(localtime())."\n\n";
+	foreach my $file (sort keys(%HitList))
+	{
+		if (length($HitList{$file}) && $HitList{$file} > 0)
+		{
+			next if $file eq 'max';
+			next if $file eq 'min';
+			if(isBlackListed($file))
+			{
+				delete($HitList{$file});
+			}
+			else
+			{
+				print $hitlist "$file $HitList{$file}\n";
+			}
+		}
+	}
+}
+
+# Purpose: Append something to the hitlist
+# Usage: AppendToHitlist(FILE);
+sub AppendToHitlist
+{
+	my $file = shift;
+	if(not $HitList{max})
+	{
+		$HitList{max} = 0;
+	}
+	if(not $HitList{min})
+	{
+		$HitList{min} = 0;
+	}
+	if ($HitList{$file})
+	{
+		$HitList{$file}++;
+		if ($HitList{$file} > $HitList{max})
+		{
+			$HitList{max} = $HitList{$file};
+		}
+		if ($HitList{min} > $HitList{$file})
+		{
+			$HitList{min} = $HitList{$file};
+		}
+	}
+	else
+	{
+		$HitList{$file} = 1;
+	}
+	HitlistWriter();
+	return true;
+}
+
+# Purpose: Gather a list of files int @FileList
+# Usage: GatherFiles($dir,test?);
+# 	If test is true then will immedietely return when it finds/doesn't find something.
+# 	Used for testing if a dir has images.
+sub GatherFiles
+{
+	BlacklistLoader();
+	HitlistLoader();
+	@FileList = ();
+	my $dir = shift;
+	my $test = shift;
+	foreach(glob($dir.'/*'))
+	{
+		next if -d $_;
+		next if not -r $_;
+		next if not /(png|jpe?g|gif)$/;
+		if ($test)
+		{
+			return true;
+		}
+		next if isBlackListed($_);
+		push(@FileList,$_);
+		if(not defined($HitList{$_}))
+		{
+			$NewFiles{$_} = true;
+		}
+	}
+	if ($test)
+	{
+		return false;
+	}
+	if(not @FileList)
+	{
+		die("Unable to find any image files in $dir\n");
+	}
+}
+
+# Purpose: Get a new random wallpaper, without taking the hitlist into consideration
+# Usage: file = GetRandomWallpaperWithoutHitlist();
+sub GetRandomWallpaperWithoutHitlist
+{
+	while(true)
+	{
+		my $nextone = int(rand(scalar(@FileList)));
+		if ($FileList[$nextone])
+		{
+			return($FileList[$nextone]);
+		}
+	}
+}
+
+# Purpose: Get a number in the range supplied
+# Usage: GetRand(MIN,MAX);
+sub GetRand
+{
+	my $min = shift;
+	my $max = shift;
+	if ($max == $min || $min > $max)
+	{
+		die("GetRand(): Assertion failed: max=$max min=$min. Min must be lower than max.");
+	}
+	while(true)
+	{
+		my $no = int(rand($max+1));
+		if ($no >= $min)
+		{
+			return($no);
+		}
+	}
+}
+
+# Purpose: Get a new random wallpaper, taking the hitlist into consideration
+# Usage: GetRandomWallpaper();
+sub GetRandomWallpaper
+{
+	HitlistLoader();
+	if (%NewFiles)
+	{
+		foreach my $f(keys(%NewFiles))
+		{
+			delete($NewFiles{$f});
+			if (not $HitList{$f})
+			{
+				return($f);
+			}
+		}
+	}
+	my $hitmax;
+	my $hitmin;
+	my $maxHits;
+	printv("Finding new wallpaper");
+	if (defined($HitList{max}))
+	{
+		$hitmax = $HitList{max};
+		$hitmin = $HitList{min};
+		if ($hitmax == 0)
+		{
+			printv("hitmax is zero, using fully random");
+			return GetRandomWallpaperWithoutHitlist();
+		}
+		# Okay, here we do some magic to favor low hit rates.
+		# If the random number generated is 0 or 1, then we use half the range.
+		# If it is 1 < then we use the whole range. This means that lower hit ranges are more likely
+		# to be taken.
+		if(int(rand(3)) > 1)
+		{
+			printv("Using full hitmax range ($hitmax+1)");
+			$maxHits = GetRand($hitmin, $hitmax+1);
+		}
+		else
+		{
+			my $myMax;
+			my $t = $hitmax;
+			# This finds a suitable range for us
+			while(true)
+			{
+				$t = $t/2;
+				if (not $hitmin+$t > $hitmin)
+				{
+					$t = $hitmin+$t+1;
+					last;
+				}
+				else
+				{
+					if ($t < 2)
+					{
+						$t = $hitmin+1;
+						last;
+					}
+				}
+			}
+			printv("Using lowered hitmax range ($t+1)");
+			$maxHits = GetRand($hitmin, $t+1);
+		}
+		printv("maxHits = $maxHits");
+	}
+	else
+	{
+		printv("No hitmax, so using fully random");
+		# Resort to standard randomization
+		return GetRandomWallpaperWithoutHitlist();
+	}
+
+	# Try max 100 times to find one within the hitlist rate
+	for (my $c = 0; $c < 100; $c++)
+	{
+		my $nextone = int(rand(scalar(@FileList)));
+		my $file = $FileList[$nextone];
+		if (not $file or not length($file))
+		{
+			next;
+		}
+		elsif(not defined($HitList{$file}) or $HitList{$file} <= $maxHits)
+		{
+			if(defined($HitList{$file}))
+			{
+				printv("Found hit: $file=$HitList{$file}");
+			}
+			else
+			{
+				printv("Found hit: $file=0");
+			}
+			return($file);
+		}
+		else
+		{
+			next;
+		}
+	}
+	printv("Giving up, going fully random");
+	# When we reached THIS far, we just go with any random thing
+	return GetRandomWallpaperWithoutHitlist();
+}
+
+# Purpose: Set a random wallpaper
+# Usage: SetRandomWallpaper();
+# 	GatherFiles() must have been run before this
+sub SetRandomWallpaper
+{
+	while(1)
+	{
+		my $file = GetRandomWallpaper();
+		system('gconftool','-t','str','-s','/desktop/gnome/background/picture_filename',$file);
+		if(open(my $GrandomCurrImg, '>',$GrandomCurrImgFile))
+		{
+			next if $file eq 'max';
+			print $GrandomCurrImg $file."\n";
+			close($GrandomCurrImg);
+		}
+		AppendToHitlist($file);
+		return;
+	}
+}
+
+# Purpose: Run the main loop
+# Usage: MainLoop(dir,sleep);
+# 	Loops eternally if $sleep is true, if not runs SetRandomWallpaper() and exits
+sub MainLoop
+{
+	my $dir = shift;
+	my $sleep = shift;
+	if(not -d $dir)
+	{
+		die("$dir: does not exist\n");
+	}
+	if(defined($sleep) and not $sleep =~ /^\d+$/)
+	{
+		die("If you supply the sleep argument, it must be an integer - the number of seconds to sleep\n");
+	}
+	if ($sleep)
+	{
+		my $PID = fork;
+		exit if $PID;
+	}
+	GatherFiles($dir);
+	for(my $ln = 0;1;$ln++)
+	{
+		SetRandomWallpaper();
+		if ($sleep)
+		{
+			LockCheck();
+			sleep($sleep);
+			# Every sixth time through the loop we check for new wallpapers
+			if ($ln > 5)
+			{
+				GatherFiles($dir);
+				$ln = 0;
+			}
+		}
+		else
+		{
+			return;
+		}
+	}
+}
+
+# Purpose: Try to autodetect the dir with the wallpapers
+# Usage: Dir = DetectWallpaperDir();
+sub DetectWallpaperDir
+{
+	# All dirs tested relative to ~/
+	my @BaseDirs = ('.grandomwallpaper.dir','wallpapers','wallpaper','background','backgrounds','bakgrunnar','bakgrunner',);
+	# Second level dirs are tested in two levels
+	my @SecondLevelDirs = ('widescreen','non-widescreen','not-widescreen','ikkje-widescreen','1280x800','1024x768','digitalblasphemy');
+	push(@SecondLevelDirs,$_) foreach(@BaseDirs);
+	# Finish them
+	@BaseDirs = FinishDetectionArray(@BaseDirs);
+	@SecondLevelDirs = FinishDetectionArray(@SecondLevelDirs);
+
+	foreach my $basedir (@BaseDirs)
+	{
+		$basedir = $ENV{HOME}.'/'.$basedir;
+		if (-d $basedir)
+		{
+			if(GatherFiles($basedir,true))
+			{
+				return($basedir);
+			}
+			foreach my $secondlevel (@SecondLevelDirs)
+			{
+				my $realsecondlevel = $basedir.'/'.$secondlevel;
+				if (-d $realsecondlevel)
+				{
+					if(GatherFiles($realsecondlevel,true))
+					{
+						return($realsecondlevel);
+					}
+					foreach my $thirdlevel (@SecondLevelDirs)
+					{
+						my $realthirdlevel = $realsecondlevel.'/'.$thirdlevel;
+						if (-d $realthirdlevel)
+						{
+							if(GatherFiles($realthirdlevel,true))
+							{
+								return($realthirdlevel);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
+
+# Purpose: Finish autodetection array
+# Usage: Array = FinishDetectionArray(Array);
+sub FinishDetectionArray
+{
+	my @array = @_;
+	my @TargetArray;
+	foreach my $part(@array)
+	{
+		push(@TargetArray,$part);
+		push(@TargetArray,'.'.$part);
+		my $firstLarge = $part;
+		substr($firstLarge,0,1) =~ tr/a-z/A-Z/;
+		my $onlyLarge = $part;
+		$onlyLarge =~ tr/a-z/A-Z/;
+		push(@TargetArray,$firstLarge);
+		push(@TargetArray,'.'.$firstLarge);
+		push(@TargetArray,$onlyLarge);
+		push(@TargetArray,'.'.$onlyLarge);
+	}
+	return(@TargetArray);
+}
+
+# Purpose: Print nicely formatted help output
+# Usage: PrintHelp("-shortoption","--longoption","Description");
+sub PrintHelp {
+	printf "%-4s %-16s %s\n", "$_[0]", "$_[1]", "$_[2]";
+}
+
+# Purpose: Print usage and exit
+# Usage: Usage();
+sub Usage
+{
+	print "GRandomWallpaper version $Version\n";
+	print "Usage: grandomwallpaper [options] [dir] [sleeptime]\n";
+	print "Options:\n";
+	PrintHelp('-h','--help','Display this help screen');
+	PrintHelp('-v', '--version', 'Display version information and exit');
+	PrintHelp('-a', '--auto', 'Try to autodetect the wallpaper directory');
+	PrintHelp('-b', '--blacklist', 'Blacklist the current image and attempt to change');
+	PrintHelp('','','image using --auto');
+	PrintHelp('', '--debuginfo','Display useful troubleshooting and debugging information');
+	print "\nDir can be omitted if using --auto. Sleeptime is optional.\n";
+	print "If sleeptime is supplied then GRandomWallpaper will go into the background\n";
+	exit(0);
+}
+
+# Purpose: Blacklist the current image
+# Usage: BlacklistImage();
+sub BlacklistImage
+{
+	open(my $bli, '<', $GrandomCurrImgFile);
+	my $img = <$bli>;
+	close($bli);
+	chomp($img);
+	$| = true;
+	print "Blacklisting $img...";
+	BlacklistLoader();
+	$BlackList{$img} = true;
+	BlacklistWriter();
+	print "done. Changing...";
+	$WPDir = DetectWallpaperDir();
+	if(not $WPDir)
+	{
+		print "failed. Unable to detect image dir.\n";
+		exit(0);
+	}
+	MainHandler();
+	print "done\n";
+}
+
+# Purpose: The main handler
+# Usage: MainHandler();
+sub MainHandler
+{
+	if(not $WPDir)
+	{
+		if(not @ARGV)
+		{
+			Usage();
+		}
+		$WPDir = shift(@ARGV);
+	}
+	my $sleep = shift(@ARGV);
+	MainLoop($WPDir,$sleep);
+}
+
+GetOptions (
+	'help|h' => sub {
+		Usage();
+	},
+	'b|blacklist' => sub {
+		BlacklistImage();
+		exit(0);
+	},
+	'v|version' => sub {
+		print "GRandomWallpaper version $Version\n";
+		exit(0);
+	},
+	'debuginfo' => sub {
+		print "GRandomWallpaper version $Version\n";
+		printf "Perl version %vd\n", $^V;
+		$WPDir = DetectWallpaperDir();
+		if ($WPDir)
+		{
+			print "-a would set the source dir to: $WPDir\n";
+		}
+		else
+		{
+			print "-a would fail\n";
+		}
+		exit(0);
+	},
+	'a|auto' => sub
+	{
+		$WPDir = DetectWallpaperDir();
+		if(not $WPDir)
+		{
+			die("Unable to autodetect dir\n");
+		}
+	},
+	'v|verbose' => \$verbose,
+) or die "See $0 --help for more information\n";
+
+MainHandler();
+
+__END__
+
+=head1 NAME
+
+GRandomWallpaper - Wallpaper randomizer for GNOME/Nautilus
+
+=head1 SYNOPSIS
+
+B<grandomwallpaper> [I<OPTIONS>] [I<SLEEPTIME>] [I<DIRECTORY>]
+
+=head1 DESCRIPTION
+
+B<GRandomWallpaper> is a wallpaper randomizer for GNOME/Nautilus written in perl.
+It keeps a hitlist so that wallpapers that have been shown often are less likely to get picked,
+if there are new files that have never been shown then that is picked.
+
+The I<SLEEPTIME> option is the time in seconds to sleep between switching wallpaper.
+If included then GRandomWallpaper will go into the background. If omitted then
+it will change the wallpaper and exit.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-h, --help>
+
+Display the help screen
+
+=item B<-v, --version>
+
+Display version information.
+
+=item B<--debuginfo>
+
+Display debugging and various other useful information and then exit.
+
+=item B<-a, --auto>
+
+Try to automatically detect the directory the wallpapers reside in.
+See --debuginfo for information on which directory it picks.
+You can use this in place of B<DIRECTORY>.
+
+If it doesn't manage to autodetect your directory, then simply symlink it to
+~/.grandomwallpaper.dir and you can use --auto regardless.
+
+=back
+
+=head1 HELP/SUPPORT
+
+If you need additional help you can e-mail me at I<<eskild at zerodogg
+dot
+org>>
+
+=head1 DEPENDENCIES
+
+Besides from perl it also requires that you're using nautilus, and
+that you have gconftool installed.
+
+=head1 AUTHOR
+
+B<GRandomWallpaper> is written by Eskild Hustvedt I<<eskild
+at
+zerodogg
+dot
+org>>
+
+=head1 FILES
+
+=over
+
+=item I<~/.grandomwallpaper.currimg>
+
+The file containing the complete path to the current wallpaper.
+
+=item I<~/.grandomwallpaper.hitlist>
+
+The hitlist, this is the file GRandomWallpaper keeps track of how often
+a wallpaper has been picked in.
+
+=item I<~/.grandomwallpaper.blacklist>
+
+The GRandomWallpaper blacklist. This isn't automatically created, but may
+be created by the user. It should contain the complete paths to any wallpapers
+that you do not want GRandomWallpaper to use.
+Any file listed here will be automatically removed from the hitlist.
+
+=back
+
+=head1 BUGS AND LIMITATIONS
+
+=over
+
+=item
+
+The lockfile mechanism assumes a Linux-style /proc filesystem, and will thus
+not work on operating systems that does not have /proc/PID and /proc/PID/cmdline
+
+=back
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) Eskild Hustvedt 2008
+
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

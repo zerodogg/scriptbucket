@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+# filenamecleaner
+# Copyright (C) Eskild Hustvedt 2008
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Recursive use:
+# find -print0 | xargs -0 filenamecleaner
+
+use strict;
+use warnings;
+use File::Copy;
+
+sub ApplyFilter
+{
+	$_ = shift;
+	# Spaces are evil
+	s/\s/_/g;
+	# () are evil
+	s/\(/-/g;
+	s/\)/-/g;
+	# [] are evil
+	s/\[/-/g;
+	s/\]/-/g;
+	# These are evil too
+	s/[\!"']/-/g;
+	s/\&/and/g;
+
+	s/%25/_/g;
+	s/%//g;
+	s/\\//g;
+	# Run these filters multiple times
+	for(my $i = 0; $i < 6; $i++)
+	{
+		# Multiple - or _ or _- are evil
+		s/-+/-/g;
+		s/_+/_/g;
+		s/_-_/-/g;
+		s/-_/-/g;
+		s/_-/-/g;
+		# Filter for various end-of-name stuff
+		s/[-_+]\.([\w\d]+)$/\.$1/;
+	}
+	return($_);
+}
+
+foreach my $orig (@ARGV)
+{
+	my $new = ApplyFilter($orig);
+	if (not $new eq $orig)
+	{
+		if (-e $new)
+		{
+			print "not moving $orig, $new already exists\n";
+		}
+		else
+		{
+			move($orig,$new);
+			print "$orig -> $new\n";
+		}
+	}
+}

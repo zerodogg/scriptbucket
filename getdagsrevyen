@@ -1,0 +1,38 @@
+#!/bin/bash
+# Copyright (C) Eskild Hustvedt 2010
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+URL="http://podkast.nrk.no/program/dagsrevyen.rss" # Dagsrevyen 18
+URL="http://podkast.nrk.no/program/dagsrevyen_21.rss" # Dagsrevyen 21
+if [ "$(date +%w)" == "1" ]; then
+	URL="http://podkast.nrk.no/program/dagsrevyen.rss" # No '21' podkast on sundays
+fi
+echo -n "Fetching and parsing rss ($URL)..."
+file="`curl -s "$URL" |\grep enclosure|\grep mp4|perl -pi -e 's#.*url="##; s#" length.*##;s#amp;##;'|head -n1`"
+echo "done"
+if [ "$file" == "" ]; then
+	echo "Found nothing to fetch"
+	exit 0
+fi
+cd ~/
+wget -c --random-wait --retry-connrefused -t 0 --limit-rate=1300k "$file"
+MYFILE="$(ls -t|\grep dagsrevyen|head -n1)"
+if [ "$(basename $0)" == "dagsrevywatch" ]; then
+	mplayer -cache 8192 -fs -zoom -ao alsa,oss,sdl -prefer-ipv4 "$MYFILE"
+	echo -n "Deleting in 5 seconds..."
+	sleep 5s
+	echo -n "deleting now..."
+	rm -f "$MYFILE"
+	echo "deleted"
+fi

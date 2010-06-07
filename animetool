@@ -1,0 +1,471 @@
+#!/usr/bin/perl
+# animetool
+# Copyright (C) Eskild Hustvedt 2008
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use Getopt::Long;
+use File::Copy qw(move);
+use File::Basename qw(basename dirname);
+Getopt::Long::Configure ("bundling", 'prefix_pattern=(--|-)');
+use constant
+{
+	MODE_RENAME => 1,
+	MODE_PLAY => 2,
+	true => 1,
+	false => 0,
+};
+
+# The base title, used in rename mode as the title part of the string,
+# in play mode as the base part of the filename. Play mode can autodetect it
+my $baseTitle;
+# The mode, either MODE_RENAME or MODE_PLAY
+my $mode = MODE_PLAY;
+# True if we are going to run rename in dry run mode
+my $dryrun = 0;
+# True if we should ignore mplayer options in the .animeinfo file
+my $IgnoreOpts = 0;
+# Version number
+my $VERSION = '0.1';
+# The mplayer commandline parameters
+my @MplayerOptions = qw(-fs -zoom -ao oss,alsa,sdl,esd -alang jp,jpn -slang en,eng,english -prefer-ipv4);
+my @AdditionalOptions;
+# The hash containing info about the current series
+my %CurrAnime = (
+	episode => 0,
+);
+
+# Commandline parsing
+GetOptions (
+	'rename=s' => sub {
+		shift;
+		$baseTitle = shift;
+		$mode = MODE_RENAME;
+	},
+	'a|appendmplayer=s' => sub {
+		shift;
+		my @AddOpt = split(/\s+/,shift);
+		push(@MplayerOptions,@AddOpt);
+		push(@AdditionalOptions,@AddOpt);
+	},
+	'ignoreopts' => \$IgnoreOpts,
+	'help' => sub
+	{
+		print "animetool version $VERSION\n\n";
+		print "USAGE: animetool\n";
+		print " OR  : animetool [NAME]\n";
+		print " OR  : animetool [OPTIONS]\n";
+		print "\nOptions:\n";
+		PrintHelp('','--help','Display this help screen');
+		PrintHelp('','--ignoreopts','Ignore mplayer options that have been saved in ./.animeinfo');
+		PrintHelp('','--rename','Rename all files supplied on the commandline to the title supplied to --rename along with the episode number and filename suffix. See the manpage.');
+		PrintHelp('','--dry-run','Just output what --rename would have done, don\'t actually do anything');
+		PrintHelp('-a','--appendmplayer','Append a parameter to the mplayer commandline');
+		exit(0);
+	},
+	'dry-run|dryrun' => \$dryrun,
+) or die("\n");
+
+if ($mode == MODE_RENAME)
+{
+	renameAnime(@ARGV);
+}
+elsif($mode == MODE_PLAY)
+{
+	playAnime(@ARGV);
+}
+else
+{
+	die("Unknown mode: $mode\n");
+}
+
+# Purpose: Make filenames all pretty
+# Usage: renameAnime(@ARGV);
+sub renameAnime
+{
+	if(not $baseTitle or not length $baseTitle or not $baseTitle =~ /\D/)
+	{
+		die("Needs a --title\n");
+	}
+	foreach my $f (@_)
+	{
+		my $no = $f;
+		if ($no =~ s/.*(S\d+\s*E\d+).*/$1/i)
+		{
+			$no =~ tr/[a-z]/[A-Z]/;
+			$no =~ s/\s*//;
+			my $mainNo = $no;
+			$mainNo =~ s/.*S\d*\s*E//;
+			if(length($mainNo) == 1)
+			{
+				$no =~ s/(S\d+\s*E)\d*/${1}0$mainNo/;
+			}
+		} 
+		else
+		{
+			$no =~ s/^\D+(\d+)\D+.*/$1/
+		}
+		if(length($no) == 1)
+		{
+			$no = "0".$no;
+		}
+		my $ext = $f;
+		$ext =~ s/^.*\.(\w+)$/$1/;
+		$ext = lc($ext); 
+		my $newName = $baseTitle.'-'.$no.'.'.$ext;
+		$newName =~ s/\s//g;
+		if (basename($newName) eq basename($f))
+		{
+			next;
+		}
+		my $target;
+		if(not basename($f) eq $f and length dirname($f))
+		{
+			print dirname($f).' { '.basename($f).' -> '.$newName."}\n";
+			$target = dirname($f).'/'.$newName;
+		}
+		else
+		{
+			print $f.' -> '.$newName."\n";
+			$target = $newName;
+		}
+		if (-e $target)
+		{
+			print "$target: already exists, not renaming\n";
+			next;
+		}
+		if (not $dryrun)
+		{
+			move($f,$target) or warn('Failed to move: '.$!."\n");
+		}
+	}
+	exit(0);
+}
+
+# Purpose: Play the next episode of an anime series
+# Usage: playAnime(@ARGV);
+sub playAnime
+{
+	my $started = time();
+	my $ep;
+	my $formatlist = '{ogm,avi,mpeg,mpg,wmv,asf,ogg}';
+
+	if(not $baseTitle)
+	{
+		$baseTitle = glob('*.'.$formatlist);
+		if(not $baseTitle)
+		{
+			die('Failed to autodetect filenames'."\n");
+		}
+		$baseTitle =~ s/^(\D+).*/$1/;
+		if(not length $baseTitle or $baseTitle =~ /\d/)
+		{
+			die('Failed to autodetect filenames'."\n");
+		}
+	}
+
+	if (-e './.animeinfo')
+	{
+		if(not -w './.animeinfo')
+		{
+			die("./.animeinfo: is not writable");
+		}
+		LoadConfigFile('./.animeinfo',\%CurrAnime, { episode => '^\d+$', mplayeroptions => '.' },false);
+	}
+	$ep = $CurrAnime{episode} +1;
+	if (length($ep) == 1)
+	{
+		$ep = '0'.$ep;
+	}
+	my $f = glob('./'.$baseTitle.'*'.$ep.'*');
+	if (not $f)
+	{
+		print "WARNING: Proper method failed, falling back to fuzzy search\n";
+		$f = glob('*'.$ep.'*.'.$formatlist);
+		if(not $f)
+		{
+			die("Fuzzy search also failed, unable to play.\n");
+		}
+	}
+	if (-e $f)
+	{
+		if ($CurrAnime{mplayeroptions} and not $IgnoreOpts)
+		{
+			push(@MplayerOptions, split(/\s+/,$CurrAnime{mplayeroptions}));
+		}
+		elsif(not $IgnoreOpts and @AdditionalOptions)
+		{
+			$CurrAnime{mplayeroptions} = join(' ',@AdditionalOptions);
+		}
+		else
+		{
+			delete($CurrAnime{mplayeroptions});
+		}
+		my $ret = system('mplayer',@MplayerOptions,$f);
+		if(not $ret == 0 or not time()-$started > (15*60))
+		{
+			$ep--;
+		}
+		$CurrAnime{episode} = $ep;
+		WriteConfigFile('./.animeinfo',\%CurrAnime, {
+				HEADER => 'Information file for "animetool"',
+				mplayeroptions => 'Additional commandline parameters for mplayer',
+				episode => 'The last episode played',
+			});
+	}
+	else
+	{
+		print "You have either completed this series, or there is no series in this directory.\n";
+		exit(0);
+	}
+}
+
+# Purpose: Print formatted --help output
+# Usage: PrintHelp("-shortoption", "--longoption", "description");
+#  Description will be reformatted to fit within a normal terminal
+sub PrintHelp {
+	# The short option
+	my $short = shift,
+	# The long option
+	my $long = shift;
+	# The description
+	my $desc = shift;
+	# The generated description that will be printed in the end
+	my $GeneratedDesc;
+	# The current line of the description
+	my $currdesc = '';
+	# The maximum length any line can be
+	my $maxlen = 80;
+	# The length the options take up
+	my $optionlen = 20;
+	# Check if the short/long are LONGER than optionlen, if so, we need
+	# to do some additional magic to take up only $maxlen.
+	# The +1 here is because we always add a space between them, no matter what
+	if ((length($short) + length($long) + 1) > $optionlen)
+	{
+		$optionlen = length($short) + length($long) + 1;
+	}
+	# Split the description into lines
+	foreach my $part (split(/ /,$desc))
+	{
+		if(defined $GeneratedDesc)
+		{
+			if ((length($currdesc) + length($part) + 1 + 20) > $maxlen)
+			{
+				$GeneratedDesc .= "\n";
+				$currdesc = '';
+			}
+			else
+			{
+				$currdesc .= ' ';
+				$GeneratedDesc .= ' ';
+			}
+		}
+		$currdesc .= $part;
+		$GeneratedDesc .= $part;
+	}
+	# Something went wrong
+	die("Option mismatch") if not $GeneratedDesc;
+	# Print it all
+	foreach my $description (split(/\n/,$GeneratedDesc))
+	{
+		printf "%-4s %-15s %s\n", $short,$long,$description;
+		# Set short and long to '' to ensure we don't print the options twice
+		$short = '';$long = '';
+	}
+	# Succeed
+	return true;
+}
+
+# Purpose: Check if a command is in PATH
+# Usage: InPath(command)
+sub InPath {
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and not -d "$_/@_" ) {   return 1; } } return 0;
+}
+
+# Purpose: Write a configuration file
+# Usage: WriteConfigFile(/FILE, \%ConfigHash, \%ExplanationHash);
+sub WriteConfigFile {
+	my ($File, $Config, $Explanations) = @_;
+
+	# Open the config for writing
+	open(my $CONFIG, ">", "$File") or do {
+		# If we can't then we error out, no need for failsafe stuff - it's just the config file
+		warn("Unable to save the configuration file $File: $!");
+		return(0);
+	};
+	if(defined($Explanations->{HEADER})) {
+		print $CONFIG "# $Explanations->{HEADER}\n";
+	}
+	foreach(sort(keys(%{$Config}))) {
+		if(defined($Explanations->{$_})) {
+			print $CONFIG "\n# $Explanations->{$_}";
+		} else {
+			next unless length($Config->{$_}) # Don't write empty options not in %Explanations
+		}
+		print $CONFIG "\n$_=$Config->{$_}\n";
+	}
+	close($CONFIG);
+}
+
+# Purpose: Load a configuration file
+# Usage: LoadConfigFile(/FILE, \%ConfigHash, \%OptionRegexHash, OnlyValidOptions?);
+#  OptionRegeXhash can be available for only a select few of the config options
+#  or skipped completely (by replacing it by undef).
+#  If OnlyValidOptions is true it will cause LoadConfigFile to skip options not in
+#  the OptionRegexHash.
+sub LoadConfigFile {
+	my ($File, $ConfigHash, $OptionRegex, $OnlyValidOptions) = @_;
+
+	open(my $CONFIG, "<", "$File") or do {
+		printf("Unable to read the configuration settings from %s: %s", $File, $!);
+		return(0);
+	};
+	while(<$CONFIG>) {
+		next if m/^\s*(#.*)?$/;
+		next unless m/=/;
+		chomp;
+		my $Option = $_;
+		my $Value = $_;
+		$Option =~ s/^\s*(.*)\s*=.*/$1/;
+		$Value =~ s/^.*=\s*(.*)\s*/$1/;
+		if($OnlyValidOptions) {
+			unless(defined($OptionRegex->{$Option})) {
+				warn("Unknown configuration option \"$Option\" in $File: Ignored.\n");
+				next;
+			}
+		}
+		unless(defined($Value)) {
+			warn("Empty value for option $Option in $File\n");
+		}
+		if(defined($OptionRegex) and defined($OptionRegex->{$Option})) {
+			my $MustMatch = $OptionRegex->{$Option};
+			unless ($Value =~ /$MustMatch/) {
+				print "Invalid setting of $Option in the config file: Must match $OptionRegex->{Option}.\n";
+				next;
+			}
+		}
+		$ConfigHash->{$Option} = $Value;
+	}
+	close($CONFIG);
+}
+
+__END__
+=head1 NAME
+
+AnimeTool - A simple utility to assist in watching anime
+
+=head1 USAGE
+
+To autodetect and play anime in the current directory, continuing with the next
+episode if animetool has been used on this series before:
+
+B<animetool>
+
+To play anime in the current directory whose filenames start with [NAME], continuing
+with the next episode if animetool has been used on this series before:
+
+B<animetool> [I<NAME>]
+
+To rename anime files to better filenames (see more information in the OPTIONS section):
+
+B<animetool> --rename [I<NEW_TITLE>] *.avi
+
+=head1 DESCRIPTION
+
+AniemTool is a simple utility that helps you manage and keep track of anime.
+
+It keeps track of which episode you're on, and lets you automagically play the next one.
+It also lets you rename your collection, so it has nice and readable filenames.
+
+=head1 OPTIONS
+
+=over
+
+=item B<-h, --help>
+
+Display the help screen.
+
+=item B<--rename>
+
+Rename all files supplied on the commandline to the title supplied to --rename 
+along with the episode number and filename suffix.
+
+Example:
+
+./ contains the following files:
+SERIES_[STHING]_2.avi SeRIES_04_[XTI]_[315CUDIS].avi
+
+If you run animetool --rename Series *avi, you will get the following files:
+Series-02.avi Series-04.avi
+
+Use --dry-run to only see what *would* have been renamed.
+
+=item B<--dry-run>
+
+Only display what --rename would have done, don't actually do anything.
+
+=item B<-a, --appendmplayer>
+
+Append something to the mplayer commandline. You can supply multiple parameters separated
+by whitespace. For instance: animetool --appendmplayer "-ao oss:/dev/dsp1"
+
+The information supplied to this option will also be written to ./.animeinfo.
+
+=item B<--ignoreopts>
+
+Ignore mplayer options found in the ./.animeinfo and remove any existing mplayer
+options from the ./.animeinfo.
+
+=back
+
+=head1 AUTHOR
+
+Eskild Hustvedt I<<eskild
+at zerodogg
+dot
+org>>
+
+=head1 FILES
+
+=over
+
+=item I<./.animeinfo>
+
+Configuration file for each directory with anime, contains information about the last
+episode played, and optionally mplayer parameters.
+
+=back
+
+=head1 SEE ALSO
+
+L<mplayer(1)>
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) Eskild Hustvedt 2008
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<http://www.gnu.org/licenses/>.

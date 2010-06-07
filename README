@@ -1,0 +1,46 @@
+This git repository contains various scripts written by Eskild Hustvedt
+that does not really merit their own git repo.
+
+I make no guarantees about the scripts in this repository, use at your own
+risk. Should you find a bug however, feel free to report it and I will look
+into fixing it.
+
+See README.copyright for copyright information, and COPYING for the full
+GPLv3 license. All scripts are distributed in the hope that they will be
+useful, but WITHOUT ANY WARRANTY.
+
+Quick description of the scripts:
+
+Script:             Description:
+-------             ------------
+animetool           A simple script to assist with watching TV/Anime series
+                    and rename files to sane filenames.
+
+dagsnytt            A script to fetch the latest "dagsnytt" (Norwegian NRK radio
+                    news) podcast and play it. Can also fetch the latest "politisk
+                    kvarter".
+
+filenamecleaner     A simple script that helps clean up nasty filenames.
+
+getdagsrevyen       A script to fetch the latest dagsrevyen (Norwegian NRK TV news)
+                    video podcast and play it.
+
+gl                  A script to query google from the command-line. Only useful to query
+                    the google utilities (such as exchange rates),
+                    ie. ./gl "1 USD in NOK".
+
+grandomwallpaper    Randomly sets a wallpaper for users using nautilus/GNOME.
+
+latexb              A simple utility script to help easily build LaTeX documents.
+
+monitorgrowth       Monitor the rate at which a file is growing.
+
+runlocale           Run a program with all locale env-variables set to the supplied
+                    setting.
+
+synaptic-scroll-fix Enable scrolling using the right-edge of a touchpad, rather than
+                    two-finger scrolling.
+
+txt2html            A *very* simple script to convert a pure-text file into HTML
+
+vim: set expandtab :

@@ -1,0 +1,131 @@
+#!/usr/bin/perl
+# latexb2
+# Copyright (C) Eskild Hustvedt 2006
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+use Getopt::Long;
+use strict;
+use warnings;
+
+my $Version = '0.1';
+
+my ($PDF, $RUNXAPP, $RUNBIB);
+
+my $OutType;
+my $Latex;
+my $Bibtex = 'bibtex';
+Getopt::Long::Configure ("bundling", 'prefix_pattern=(--|-)');
+
+# Purpose: Print formatted --help output
+# Usage: PrintHelp("-shortoption", "--longoption", "description");
+sub PrintHelp ($$$) {
+	printf "%-4s %-16s %s\n", "$_[0]", "$_[1]", "$_[2]";
+}
+
+sub MainBuild {
+	my $FILE = shift;
+	my $AUXFILE;
+	unless(defined($FILE) and length($FILE)) {
+		die("I need at least one commandline option: The LaTeX source file.\n")
+	}
+
+	unless(-e $FILE) {
+		if (-e "$FILE.tex") {
+			$FILE = "$FILE.tex";
+		} elsif (-e "${FILE}tex") {
+			$FILE = "${FILE}tex";
+		} else {
+			die("$FILE: Does not exist\n");
+		}
+	}
+
+	if($PDF) {
+		$Latex = 'pdflatex';
+	} else {
+		$Latex = 'latex';
+	}
+
+	if(not InPath($Latex))
+	{
+		die($Latex.': is missing. Please install it and then re-run latexb'."\n");
+	}
+
+	# Set AUXFILE
+	$AUXFILE = $FILE;
+	$AUXFILE =~ s/tex$/aux/;
+
+	my $Basename = $FILE;
+	$Basename =~ s/\.tex$//;
+
+	# Run LaTeX three times and bibtex once if $RUNBIB is true
+	system("$Latex $FILE");
+	foreach(qw(bbl blg bib aux)) {
+		if (-e "$Basename.$_") {
+			$RUNBIB = 1;
+			last;
+		}
+	}
+	system("$Bibtex $AUXFILE") if $RUNBIB;
+	system("$Latex $FILE");
+	system("$Latex $FILE");
+
+	if(defined($RUNXAPP)) {
+		my $XFILE = $FILE;
+		if($PDF) {
+			$XFILE =~ s/tex$/pdf/;
+			die "$XFILE doesn't exist, unable to start evince\n" unless -e $XFILE;
+			system("evince $XFILE");
+		} else {
+			$XFILE =~ s/tex$/dvi/;
+			die "$XFILE doesn't exist, unable to start xdvi\n" unless -e $XFILE;
+			system("xdvi -thorough $XFILE");
+		}
+	}
+}
+
+# Purpose: Check for a file in path
+# Usage: InPath(FILE)
+sub InPath
+{
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return "$_/@_"; } } return 0;
+}
+
+# Get commandline options
+GetOptions (
+	'p|pdf' => \$PDF,
+	'b|bib' => \$RUNBIB,
+	'x|xdvi' => \$RUNXAPP,
+	'e|evince' => \$RUNXAPP,
+	'h|help' => sub {
+		print "latexb - LaTeX builder $Version\n\n";
+		print "Usage: $0 [OPTIONS] filename.tex\n\n";
+		PrintHelp("-b", "--bib", "Run through bibtex. Only needed once, latexb will autodetect");
+		PrintHelp("", "", "it afterwards");
+		PrintHelp("-p", "--pdf", "Use pdflatex instead of latex");
+		PrintHelp("-x", "--xdvi", "Run xdvi on the resulting *.dvi");
+		PrintHelp("-e", "--evince", "Run evince on the resulting *.pdf");
+		PrintHelp("-h", "--help", "Display this help screen");
+		print "\nIf --evince is supplied when building a dvi it acts as an alias for -x\n";
+		print "If --xdvi is supplied when building a pdf it acts as an alias for -e\n";
+		exit(0);
+	},
+) or die("See $0 --help for more information\n");
+
+die("Requires one option: the file to build\n") if not @ARGV;
+
+foreach my $CurrentFile (@ARGV) {
+	MainBuild($CurrentFile);
+}

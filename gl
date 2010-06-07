@@ -1,0 +1,22 @@
+#!/bin/bash
+# Copyright (C) Eskild Hustvedt 2010
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+STR="$(perl -MURI::Escape -e 'print uri_escape($ARGV[0])' "$*")"
+if [ "$STR" == "" ]; then
+	echo "USAGE: gl 'string'"
+	exit 1
+fi
+\curl -A 'Mozilla/5.0 (X11; U; Linux x86_64; en-GB; rv:1.9b4) Gecko/2008031318 Firefox/3.0b4' -s "http://www.google.no/search?q=$STR" | perl -pi -e 'chomp;'| perl -pi -e 's#^.*<table[^>]*class=std[^>]*>##i'|perl -pi -e 's#</table>.*##; s#.*<b>##; s#</b>.*##'
+echo

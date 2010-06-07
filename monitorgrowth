@@ -1,0 +1,281 @@
+#!/usr/bin/perl
+# A simple script that monitors how fast a file grows
+# Copyright (C) Eskild Hustvedt 2007
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use IPC::Open2;
+
+my $lastOut = 0;
+$SIG{INT} = sub {print "\n"; exit(0)};
+$SIG{TERM} = $SIG{INT};
+
+# Purpose: Output status information
+# Usage: output(STRING);
+#  This function requires a global $lastOut scalar
+sub output
+{
+	# The string to output
+	my $string = shift;
+	# Clear the last output first
+	if ($lastOut != 0)
+	{
+		for(my $c = 0; $c < $lastOut; $c++)
+		{
+			print "\b \b";
+		}
+	}
+	# Get the size
+	$lastOut = length($string);
+	# Output
+	print $string;
+	# Purge the buffer
+	$| = 1;
+	$| = 0;
+}
+
+# Purpose: Get the total file size and the type.
+# Usage: my($s, $t) = fsize(size);
+#  $t is MB, KB or B
+#  $s is the size in $t rounded to the nearest:
+#  	- single decimal if $t is MB
+#  	- integer if $t is KB or B
+sub fsize
+{
+	# The size
+	my $size = shift;
+	# The type it is
+	my $type = 'B';
+	# If it is above 1024 then convert to KB
+	if ($size > 1_024)
+	{
+		$size = $size / 1_024;
+		# If it is above 1024 still, convert to MB
+		if ($size > 1_024)
+		{
+			$size = $size / 1_024;
+			$type = 'MB';
+		}
+		else
+		{
+			$type = 'KB';
+		}
+	}
+	if ($type eq 'MB')
+	{
+		$size = sprintf("%.1f",$size);
+	}
+	else
+	{
+		# Round it off to the closest integer
+		$size = int($size + .5);
+	}
+	# Return it
+	return($size,$type);
+}
+
+# Purpose: Get information about a file
+# Usage: my(fname,size) = fileinfo(file);
+sub fileinfo
+{
+	my $file = shift;
+	my $curr = -s $file;
+	if ($curr)
+	{
+		return(undef,$curr);
+	}
+	else
+	{
+		return("$file: file disappeared",undef);
+	}
+}
+
+# Purpose: Get information about a device
+# Usage: my(devname,size) = devinfo(dev);
+# 	Requires it to be mounted
+sub devinfo
+{
+	my $dev = shift;
+	my $dfIn = qx(/bin/df -a -P -k 2> /dev/null);
+	my $size;
+	foreach my $line (split(/\n/,$dfIn))
+	{
+		if ($line =~ /^$dev/ or $line =~ /$dev?$/)
+		{
+			$size = $line;
+			$size =~ s/^\S+\s+\S+\s+(\S+)\s+.*/$1/;
+			last;
+		}
+	}
+	if ($size)
+	{
+		# size is output in K, so * it with 1024 to get bytes
+		$size = $size * 1024;
+		return($dev,$size);
+	}
+	else
+	{
+		output("");
+		if (-b $dev)
+		{
+			die("Unable to get device info, device not mounted?\n");
+		}
+		elsif (-c $dev)
+		{
+			die("Unable to get device info, is it really a device that can be mounted?\n");
+		}
+		elsif (-d $dev)
+		{
+			die("Unable to get device info, maybe $dev is not a mountpoint?\n");
+		}
+		else
+		{
+			die("Unable to get device info, device does not exist?\n");
+		}
+	}
+}
+
+sub dirinfo
+{
+	system('sync');
+	my $dir = shift;
+	open2(my $out, my $in,'du','--block-size=1','--max-depth=0',$dir);
+	my $info = <$out>;
+	close($out);close($in);
+	chomp($info);
+	$info =~ s/^(\d+)\D+.*$/$1/;
+	if ($info)
+	{
+		return($dir,$info);
+	}
+	else
+	{
+		output("");
+		if (-b $dir)
+		{
+			die("Unable to get directory info, directory not mounted?\n");
+		}
+		elsif (-d $dir)
+		{
+			die("Unable to get directory info, maybe $dir is not a directory?\n");
+		}
+		else
+		{
+			die("Unable to get directory info, directory does not exist?\n");
+		}
+	}
+}
+
+# Purpose: Main loop
+# Usage: main();
+sub main
+{
+	# Output the initial string
+	output("Not enough data yet...");
+	# The file to get info from
+	my $getinfo = shift;
+	# The param to the getinfo
+	my $param = shift;
+	# Array that the file sizes will be saved in
+	my @Sizes;
+	# The last file size - used for growth detection
+	my ($name, $last) = $getinfo->($param);
+	my $curr;
+	# The main loop
+	while(1)
+	{
+		# Sleep for one second before going on
+		sleep(1);
+		# The current file size
+		($name,$curr) = $getinfo->($param);
+		if ($name and not $curr)
+		{
+			output($name);
+			@Sizes = ();
+			next;
+		}
+		# Add it to the size array
+		if ($curr and $last)
+		{
+			push(@Sizes, $curr - $last);
+		}
+		else
+		{
+			push(@Sizes,$last);
+		}
+		# Set the last to curr
+		$last = $curr;
+		# Begin calculating if @Sizes has more than 3 entries
+		if (scalar(@Sizes) > 3)
+		{
+			# Calculate average
+			my $total;
+			# Calculate the total growth
+			foreach(@Sizes)
+			{
+				$total += $_;
+			}
+			# Get the growth rate
+			my ($avg,$avgT) = fsize($total / scalar(@Sizes));
+			# Get the current file size
+			my ($cS,$cT) = fsize($curr);
+			# Output the size
+			my $OutPrefix = "";
+			if ($name)
+			{
+				$OutPrefix = $name.': ';
+			}
+			output "$OutPrefix$avg $avgT/s (size: $cS $cT)";
+			# Shift from the array to ensure it doesn't grow too large
+			if (@Sizes > 5)
+			{
+				shift(@Sizes);
+			}
+		}
+	}
+}
+
+# The file
+my $file = shift;
+die("Requires a signle argument: the file or device to watch\n") if not $file;
+# Make sure the file exists
+die("$file: does not exist\n") if not -e $file;
+if ($file =~ m#^/dev#)
+{
+	main(\&devinfo,$file);
+}
+elsif (-d $file)
+{
+	print "$file: is a directory. Checking if it's a mountpoint\n";
+	eval
+	{
+		devinfo($file);
+	};
+	if ($@)
+	{
+		print "Not a mountpoint, assuming you want to monitor directory growth.\n";
+		dirinfo($file);
+		main(\&dirinfo,$file);
+	}
+	else
+	{
+		main(\&devinfo,$file);
+	}
+}
+else
+{
+	main(\&fileinfo,$file);
+}

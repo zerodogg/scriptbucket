@@ -1,0 +1,2 @@
+#!/bin/bash
+exec synclient VertTwoFingerScroll=0 VertEdgeScroll=1 RightEdge=400 VertScrollDelta=12

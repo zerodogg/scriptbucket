@@ -1,0 +1,44 @@
+#!/bin/bash
+# txt2html - A simple script to convert a pure-text file into html
+if [ "$1" == "" ] || [ ! -e "$1" ]; then
+	echo "ERROR!"
+	echo "Use: $0 file"
+	exit 1
+fi
+OUTFILE="$1.html"
+TITLE="$1"
+if [ "$TXT2HTML_TITLE" != "" ]; then
+	TITLE="$TXT2HTML_TITLE"
+fi
+[ "$2" != "" ] && OUTFILE="$2"
+EXTRATAGS='<meta name="robots" content="noindex, nofollow" />'
+[ "$3" != "" ] && EXTRATAGS=''
+FILEONFILE="`file -b $1`"
+if [ "`echo $FILEONFILE|grep "UTF-8 Unicode"`" ]; then
+	CHARSET="UTF-8"
+elif [ "`echo $FILEONFILE|grep "ISO-8859 text"`" ]; then
+	CHARSET="ISO-8859"
+else
+	echo "WARNING: Unable to detect CHARSET! Falling back to UTF-8"
+	CHARSET="UTF-8"
+fi
+EOF=__TXT2HTML__EOF__CONV__$RANDOM$RANDOM$RANDOM
+cat << $EOF > "$OUTFILE"
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+<meta http-equiv="Content-Type" content="text/html charset=$CHARSET" />
+$EXTRATAGS
+<title>$TITLE</title>
+</head>
+<body>
+<p><code>
+`cat $1|perl -pe 's#>#&gt;#g; s#<#&lt;#g; s#\t#    #g; s#(https?://[^\s\)]+)#<a href="$1">$1</a>#gi;s#\&#&amp;#g; s# #&nbsp;#g; s#\n#<br />\n#g;s#a&nbsp;href#a href#g'`
+</code></p>
+<p>
+<a href="http://validator.w3.org/check?uri=referer"><img
+src="http://www.w3.org/Icons/valid-xhtml10-blue"
+alt="Valid XHTML 1.0 Strict" height="31" width="88" style="border:0;width:88;height:31;" /></a>
+</p>
+</body>
+</html>
+$EOF
