@@ -50,6 +50,11 @@ COPYING for the full license text.
                         two-finger scrolling.
     
     txt2html            A *very* simple script to convert a pure-text file into HTML.
+
+    zd-cleandir         A script to help clean up directories that constantly get new files
+                        (such as mail attachment directories). It will sort files into YYYY/MM
+                        directories for more permanent storage. Only files older than 7 days
+                        will be sorted. Depends upon filenamecleaner.
     
     wma2ogg             Quick and dirty hack to convert *.wma files to OGG Vorbis.
 
