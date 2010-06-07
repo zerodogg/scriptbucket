@@ -1,0 +1,61 @@
+#!/bin/bash
+# Copyright (C) Eskild Hustvedt 2005
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Ugly hack to convert wma to ogg using mplayer and oggenc
+# NO WARRANTY WHATSOEVER
+
+# Temporary mplayer info file
+TIEFILE="/tmp/wma2ogg$$_`whoami`"
+# Temporary audio file
+AUDIOFILE="/tmp/wma2ogg$$.`whoami`-SOUND_$RANDOM$RANDOM"
+echo "Decoding to $AUDIOFILE"
+# Decode the wma using mplayer
+mplayer -vc null -vo null -ao pcm:file="$AUDIOFILE" "$1" | tee $TIEFILE
+mplayerret="$?"
+# Read and remove the info file
+MYFILE="`cat $TIEFILE`"
+rm -f $TIEFILE
+# Verify return value
+if [ "$mplayerret" != "0" ]; then
+	echo "Decoding failed! mplayer exited with return value $ret"
+	rm -f $AUDIOFILE
+	exit $ret
+fi
+# Parse the info file, getting the name (trackname) and author (artist)
+#  so that the new file will have at least some tags.
+SONGNAME="`echo "$MYFILE"|grep " name: "|sed -e s,' name: ','',g`"
+ALBUM=""
+if [ "`echo $SONGNAME|grep -i /`" != "" ]; then
+	O="$SONGNAME"
+	ALBUM="`echo $SONGNAME |perl -pi -e 's#/.*$##g;'`"
+	SONGNAME="`echo $O |perl -pi -e 's#^.*/##g;'`"
+fi
+ARTISTNAME="`echo "$MYFILE"|grep " author: "|sed -e s,' author: ','',g`"
+ENC="`echo "$1"|sed -e s,'wma$','ogg',g`"
+echo "Encoding to $ENC"
+oggenc -a "$ARTISTNAME" -l "$ALBUM" -t "$SONGNAME" $AUDIOFILE -o "$ENC"
+oggret="$?"
+rm -f /tmp/wma2ogg$$
+# Verify return value
+if [ "$oggret" != "0" ]; then
+	echo "Encoding failed! oggenc exited with return value $ret"
+	rm -f $ENC
+	exit $ret
+fi
+# TODO Real commandline options
+if [ "$2" == "-d" ]; then
+	rm -fv "$1"
+fi

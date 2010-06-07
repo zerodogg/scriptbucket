@@ -1,0 +1,64 @@
+#!/usr/bin/perl
+# aac2ogg - A quick and dirty aac to ogg vorbis converter
+# Copyright (C) Eskild Hustvedt 2006
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+
+# Usage: InPath(command)
+sub InPath ($) {
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {   return 1; } } return 0;
+}
+
+die("Unable to find mplayer\n") unless InPath("mplayer");
+die("Unable to find faad\n") unless InPath("faad");
+die("Unable to find oggenc\n") unless InPath("oggenc");
+
+$| = 1;
+foreach my $file (@ARGV) {
+	my %FileInfo = (
+		title => "unknown",
+		artist=> "unknown",
+		album => "unknown",
+		track => 00,
+	);
+	my $TempFile = "convert_temp.wav";
+	print "$file\n";
+	my $TempInfo = qx/faad -i $file 2>&1/;
+	foreach my $line (split(/\n/, $TempInfo)) {
+		foreach my $check (qw/title artist track album/) {
+			if($line =~ s/^$check:\s+//) {
+				$FileInfo{$check} = $line;
+				last;
+			}
+		}
+	}
+	print " $FileInfo{title} by $FileInfo{artist} on $FileInfo{album}\n";
+	print " Converting to wav...";
+	system("mplayer", "-ao", "pcm:file=$TempFile", $file, "&>/dev/null");
+	print "done. Encoding to ogg...";
+	my $OutName = $file;
+	$OutName =~ s/\.\w+$/\.ogg/g;
+#	my $OutName = "$FileInfo{track}-$FileInfo{artist}-$FileInfo{title}.ogg";
+#	$OutName =~ s/\s+/_/g;
+#	$OutName =~ s/\(?\)?,?'?"?//g;
+#	if($OutName =~ /^\d-/) {
+#		$OutName = "0$OutName";
+#	}
+	system("oggenc", "-Q", "-q 5", $TempFile, "--tracknum", $FileInfo{track}, "--title", $FileInfo{title}, "--album", $FileInfo{album}, "--artist", $FileInfo{artist}, "-o", $OutName);
+	print "done. Written to $OutName\n";
+	unlink($TempFile);
+}

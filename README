@@ -13,6 +13,8 @@ Quick description of the scripts:
 
 Script:             Description:
 -------             ------------
+aac2ogg             Quick and dirty hack to convert *.aac files to OGG Vorbis
+
 animetool           A simple script to assist with watching TV/Anime series
                     and rename files to sane filenames.
 
@@ -42,5 +44,7 @@ synaptic-scroll-fix Enable scrolling using the right-edge of a touchpad, rather 
                     two-finger scrolling.
 
 txt2html            A *very* simple script to convert a pure-text file into HTML
+
+wma2ogg             Quick and dirty hack to convert *.wma files to OGG Vorbis
 
 vim: set expandtab :
