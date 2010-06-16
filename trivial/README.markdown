@@ -21,5 +21,9 @@ COPYING for the full license text.
     fix7digitalTags     Fixes the tags on MP3 files bought from the 7digital store.
                         For some reason they like adding "(LP Version)" to title tags,
                         this script strips that.
+    
+    gl                  A script to query google from the command-line. Only useful to query
+                        the google utilities (such as exchange rates),
+                        ie. ./gl "1 USD in NOK".
 
 vim: set expandtab :
