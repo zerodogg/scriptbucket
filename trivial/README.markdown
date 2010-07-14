@@ -25,5 +25,8 @@ COPYING for the full license text.
     gl                  A script to query google from the command-line. Only useful to query
                         the google utilities (such as exchange rates),
                         ie. ./gl "1 USD in NOK".
+    
+    vim-mason           A quick and dirty hack to get mason syntax hilighting working in
+                        newer versions of vim
 
 vim: set expandtab :
