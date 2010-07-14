@@ -1,0 +1,196 @@
+#!/usr/bin/perl
+# prepVim
+# Script that downloads and installs all vim plugins I use
+# Copyright (C) Eskild Hustvedt 2010
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use File::Path qw(mkpath);
+use File::Basename qw(basename dirname);
+use File::Copy qw(move);
+use Fatal qw(chdir mkpath);
+
+# Alter this to suit your liking
+my %plugins = (
+	'perl-syntax' => {
+		type => 'raw',
+		target => 'syntax/perl.vim',
+		url => 'http://www.vim.org/scripts/download_script.php?src_id=11458',
+	},
+	'indentAnything' => {
+		type => 'tar.gz',
+		url => 'http://www.vim.org/scripts/download_script.php?src_id=10228',
+	},
+	'icalendar' => {
+		type => 'raw',
+		target => 'syntax/icalendar.vim',
+		url => 'http://www.vim.org/scripts/download_script.php?src_id=5573',
+	},
+	'gettext-po' => {
+		type => 'raw',
+		target => 'ftplugin/po.vim',
+		url => 'http://www.vim.org/scripts/download_script.php?src_id=4159',
+	},
+	'vim-markdown' => {
+		type => 'git',
+		url => 'http://github.com/tpope/vim-markdown.git',
+	},
+	'taglist' => {
+		type => 'zip',
+		url => 'http://vim.sourceforge.net/scripts/download_script.php?src_id=7701',
+	},
+	'vim-mason' => {
+		type => 'raw',
+		multi => [
+			{
+				target => 'syntax/oldperl.vim',
+				url => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/oldperl.vim',
+			},
+			{
+				target => 'syntax/mason.vim',
+				url => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/mason.vim',
+			}
+		]
+	},
+);
+
+# We need $HOME
+die("HOME not set\n") if not $ENV{HOME};
+# Prepare initial directories
+my $bundleDir = $ENV{HOME}.'/.vim/bundle';
+needDir($bundleDir);
+needDir($ENV{HOME}.'/.vim/autoload');
+chdir($ENV{HOME}.'/.vim');
+
+# Install pathogen
+print "Fetching prerequisite: pathogen\n";
+unlink('./autoload/pathogen.vim') if -e './autoload/pathogen.vim';
+get('http://www.vim.org/scripts/download_script.php?src_id=12116','./autoload/pathogen.vim');
+
+# Install all other plugins listed in the %plugins hash
+foreach my $plugin (sort keys(%plugins))
+{
+	installPlugin($plugin,$plugins{$plugin});
+}
+
+print "\nAll plugins successfully installed.\n";
+$| = 1;
+# Generate helptags
+print "Running pathogen#helptags() in vim to generate helptags...";
+system('vim','-c',':call pathogen#runtime_append_all_bundles()','-c',':call pathogen#helptags()','-c',':q');
+print "done\n";
+# Output a message if .vimrc isn't using pathogen.
+# Yes, I know using grep is ugly - but I'm lazy, so there.
+if (system('grep','-q','pathogen#runtime_append_all_bundles',$ENV{HOME}.'/.vimrc') != 0)
+{
+	print "NOTE: Remember to add \"silent! call pathogen#runtime_append_all_bundles()\"\n";
+	print "      to the start of your ~/.vimrc\n";
+}
+exit(0);
+
+# Purpose: Retrieve a file using wget
+sub get
+{
+	my $url = shift;
+	my $outfile = shift;
+	system(qw(wget --no-verbose -c --random-wait --retry-connrefused -t 0),'-O',$outfile,$url);
+	die("Download failed\n") if not -e $outfile;
+}
+
+# Purpose: Recreate a directory
+sub needFreshDir
+{
+	my $dir = shift;
+	system('rm','-rf',$dir)
+		if (-e $dir);
+	needDir($dir);
+}
+
+# Purpose: Create a directory if it doesn't exists
+sub needDir
+{
+	my $dir = shift;
+	if(not -e $dir)
+	{
+		mkpath($dir);
+	}
+}
+
+# Purpose: Install a plugin, will call other installPlugin_ functions as needed
+sub installPlugin
+{
+	my $plugin = shift;
+	my $info = shift;
+	print "Installing: $plugin\n";
+	chdir($bundleDir);
+	needFreshDir($bundleDir.'/'.$plugin);
+	chdir($plugin);
+	if ($info->{type} eq 'git')
+	{
+		installPlugin_git($plugin,$info);
+	}
+	elsif($info->{type} eq 'raw')
+	{
+		installPlugin_raw($plugin,$info);
+	}
+	else
+	{
+		my $out = './file.out';
+		unlink($out) if -e $out;
+		get($info->{url},$out);
+		if ($info->{type} eq 'zip')
+		{
+			system('unzip','-q',$out) and die();
+		}
+		elsif($info->{type} eq 'tar.gz')
+		{
+			move($out,'plugin.tar.gz');
+			system('tar','-zxf','plugin.tar.gz') and die();
+		}
+		unlink($out);
+	}
+	chdir('..');
+}
+
+# Purpose: Install a plugin using git
+sub installPlugin_git
+{
+	my $plugin = shift;
+	my $info = shift;
+	system('git','clone','-q',$info->{url},'./') and die("git failed to clone the repository.\n");
+}
+
+# Purpose: Install a 'raw' plugin (ie. not archived or git)
+sub installPlugin_raw
+{
+	my $plugin = shift;
+	my $info = shift;
+	my @files;
+	if ($info->{multi})
+	{
+		@files = @{$info->{multi}};
+	}
+	else
+	{
+		@files = ( $info );
+	}
+	foreach my $f (@files)
+	{
+		my $out = $f->{target};
+		needDir(dirname($out));
+		get($f->{url},$out);
+	}
+}

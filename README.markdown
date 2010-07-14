@@ -37,6 +37,9 @@ COPYING for the full license text.
     latexb              A simple utility script to help easily build LaTeX documents.
     
     monitorgrowth       Monitor the rate at which a file is growing.
+
+    prepVim             A script that downloads and installs vim plugins. Uses pathogen
+                        to make sure ~/.vim is not cluttered.
     
     reencode            A simple script to assist with re-encoding MP3-files.
     
