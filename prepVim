@@ -280,8 +280,12 @@ sub installPlugin_vimball
 	my $info   = shift;
 	my $outDir = $bundleDir.'/'.$name;
 	my $vimVer = qx(vim --version|grep "VIM - Vi IMproved"|perl -pi -e 's/^\\D+//; s/\\s+.*//g;');
+	my $majVer = $vimVer;
+	my $miVer  = $vimVer;
+	$majVer    =~ s/^(\d+)\..*/$1/;
+	$miVer     =~ s/^.+\.(\d+)$/$1/;
 
-	if ($vimVer !~ /^7/ || $vimVer =~ /\.[01]$/)
+	if ($majVer < 7 || ($majVer == 7 && $miVer < 2))
 	{
 		print "vimball unsupported in your vim version - skipping installation\n";
 		return;
