@@ -81,6 +81,10 @@ my %plugins = (
 		url => 'http://zarb.org/~zerodogg/mirrored/javascript.vim',
 		target => 'indent/javascript.vim',
 	},
+	'align' => {
+		type => 'vimball',
+		vimOrgId => 10110,
+	},
 );
 
 # We need $HOME
@@ -113,7 +117,7 @@ print "\nAll plugins successfully installed.\n";
 $| = 1;
 # Generate helptags
 print "Running pathogen#helptags() in vim to generate helptags...";
-system('vim','-c',':call pathogen#runtime_append_all_bundles()','-c',':call pathogen#helptags()','-c',':q');
+system('vim','-c',':call pathogen#runtime_append_all_bundles()','-c',':call pathogen#helptags()','-c',':q!');
 print "done\n";
 # Output a message if .vimrc isn't using pathogen.
 # Yes, I know using grep is ugly - but I'm lazy, so there.
@@ -167,6 +171,22 @@ sub InPath
 	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {   return 1; } } return 0;
 }
 
+# Purpose: Run a system() in a child (silencing it without using /bin/sh)
+sub SilentSystem
+{
+	no warnings;
+	open(STDOUT_SAVED,'>&STDOUT');
+	open(STDERR_SAVED,'>&STDERR');
+	open(STDOUT,'>','/dev/null');
+	open(STDERR,'>','/dev/null');
+	my $ret = system(@_);
+	$ret = $ret >> 8;
+	open(STDOUT,'>&STDOUT_SAVED');
+	open(STDERR,'>&STDERR_SAVED');
+	use warnings;
+	return($ret);
+}
+
 # Purpose: Install a plugin, will call other installPlugin_ functions as needed
 sub installPlugin
 {
@@ -194,9 +214,13 @@ sub installPlugin
 	{
 		installPlugin_raw($plugin,$info);
 	}
+	elsif($info->{type} eq 'vimball')
+	{
+		installPlugin_vimball($plugin,$info);
+	}
 	else
 	{
-		my $out = './file.out';
+		my $out = $bundleDir.'/'.$plugin.'/file.out';
 		unlink($out) if -e $out;
 		get($info->{url},$out);
 		if ($info->{type} eq 'zip')
@@ -207,6 +231,10 @@ sub installPlugin
 		{
 			move($out,'plugin.tar.gz');
 			system('tar','-zxf','plugin.tar.gz') and die();
+		}
+		elsif($info->{type} eq 'vimball')
+		{
+			installPlugin_vimball($plugin,$info,$out);
 		}
 		unlink($out);
 	}
@@ -243,4 +271,34 @@ sub installPlugin_raw
 		needDir(dirname($out));
 		get($f->{url},$out);
 	}
+}
+
+# Purpose: Install a "vimball"
+sub installPlugin_vimball
+{
+	my $name   = shift;
+	my $info   = shift;
+	my $outDir = $bundleDir.'/'.$name;
+	my $vimVer = qx(vim --version|grep "VIM - Vi IMproved"|perl -pi -e 's/^\\D+//; s/\\s+.*//g;');
+
+	if ($vimVer !~ /^7/ || $vimVer =~ /\.[01]$/)
+	{
+		print "vimball unsupported in your vim version - skipping installation\n";
+		return;
+	}
+
+	print "(note: $name is a vimball, screen might flicker during install)\n";
+
+	unlink($outDir.'/vimball.vba.gz') if -e $outDir.'/vimball.vba.gz';
+	get($info->{url},$outDir.'/vimball.vba.gz');
+
+	# We don't /know/ if it's a gzip file, so we just try to gunzip it.
+	# If it fails, it's not a gzip file - and we can just go on processing
+	# it anyway.
+	SilentSystem('gunzip','-q',$outDir.'/vimball.vba.gz');
+	move($outDir.'/vimball.vba.gz',$outDir.'/vimball.vba') if -e $outDir.'/vimball.vba.gz';
+
+	my $target = $bundleDir.'/'.$name;
+	system('vim','-c',':let g:vimball_home="'.$target.'"','-c',':so %','-c',':q!',$outDir.'/vimball.vba');
+	unlink($outDir.'/vimball.vba');
 }
