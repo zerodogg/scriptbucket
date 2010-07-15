@@ -65,10 +65,29 @@ my %plugins = (
 			}
 		]
 	},
+	'javascript-syntax' => {
+		type => 'raw',
+		url => 'http://www.vim.org/scripts/download_script.php?src_id=10728',
+		target => 'syntax/javascript.vim',
+	},
+	'javascript-indent' => {
+		type => 'raw',
+		# This is only available on the vim wiki (http://vim.wikia.com/wiki/Improved_Javascript_Indent_script_for_Vim)
+		# so I have mirrored the script file itself so that it can be installed by prepVim
+		url => 'http://zarb.org/~zerodogg/mirrored/javascript.vim',
+		target => 'indent/javascript.vim',
+	},
 );
 
 # We need $HOME
 die("HOME not set\n") if not $ENV{HOME};
+
+# Validate deps
+foreach my $d (qw(git wget unzip tar gunzip vim))
+{
+	die("Dependency missing, please install $d\n") if not InPath($d);
+}
+
 # Prepare initial directories
 my $bundleDir = $ENV{HOME}.'/.vim/bundle';
 needDir($bundleDir);
@@ -114,9 +133,16 @@ sub get
 sub needFreshDir
 {
 	my $dir = shift;
+	rmDirTree($dir);
+	needDir($dir);
+}
+
+# Purpose: Remove a directory tree if it exists
+sub rmDirTree 
+{
+	my $dir = shift;
 	system('rm','-rf',$dir)
 		if (-e $dir);
-	needDir($dir);
 }
 
 # Purpose: Create a directory if it doesn't exists
@@ -129,15 +155,27 @@ sub needDir
 	}
 }
 
+# Usage: InPath(command)
+sub InPath
+{
+	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {   return 1; } } return 0;
+}
+
 # Purpose: Install a plugin, will call other installPlugin_ functions as needed
 sub installPlugin
 {
 	my $plugin = shift;
 	my $info = shift;
 	print "Installing: $plugin\n";
-	chdir($bundleDir);
-	needFreshDir($bundleDir.'/'.$plugin);
-	chdir($plugin);
+	# Older versions of git can't clone into an existing directory, so let git
+	# create it itself.
+	if ($info->{type} ne 'git')
+	{
+		chdir($bundleDir);
+		needFreshDir($bundleDir.'/'.$plugin);
+		chdir($plugin);
+	}
+
 	if ($info->{type} eq 'git')
 	{
 		installPlugin_git($plugin,$info);
@@ -170,7 +208,9 @@ sub installPlugin_git
 {
 	my $plugin = shift;
 	my $info = shift;
-	system('git','clone','-q',$info->{url},'./') and die("git failed to clone the repository.\n");
+	chdir($bundleDir);
+	rmDirTree('./'.$plugin);
+	system('git','clone','-q',$info->{url},'./'.$plugin) and die("git failed to clone the repository.\n");
 }
 
 # Purpose: Install a 'raw' plugin (ie. not archived or git)
