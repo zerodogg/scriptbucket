@@ -23,26 +23,30 @@ use File::Basename qw(basename dirname);
 use File::Copy qw(move);
 use Fatal qw(chdir mkpath);
 
-# Alter this to suit your liking
+# Alter this to suit your liking.
+# 
+# You can either set url=> to a fully qualified URL on where to get the plugin,
+# or you can set vimOrgId=>, in which case prepVim will download from
+# http://www.vim.org/scripts/download_script.php?src_id=[VIMORGID]
 my %plugins = (
 	'perl-syntax' => {
 		type => 'raw',
 		target => 'syntax/perl.vim',
-		url => 'http://www.vim.org/scripts/download_script.php?src_id=11458',
+		vimOrgId => 11458,
 	},
 	'indentAnything' => {
 		type => 'tar.gz',
-		url => 'http://www.vim.org/scripts/download_script.php?src_id=10228',
+		vimOrgId => 10228,
 	},
 	'icalendar' => {
 		type => 'raw',
 		target => 'syntax/icalendar.vim',
-		url => 'http://www.vim.org/scripts/download_script.php?src_id=5573',
+		vimOrgId => 5573,
 	},
 	'gettext-po' => {
 		type => 'raw',
 		target => 'ftplugin/po.vim',
-		url => 'http://www.vim.org/scripts/download_script.php?src_id=4159',
+		vimOrgId => 4159,
 	},
 	'vim-markdown' => {
 		type => 'git',
@@ -50,7 +54,7 @@ my %plugins = (
 	},
 	'taglist' => {
 		type => 'zip',
-		url => 'http://vim.sourceforge.net/scripts/download_script.php?src_id=7701',
+		vimOrgId => 7701,
 	},
 	'vim-mason' => {
 		type => 'raw',
@@ -67,7 +71,7 @@ my %plugins = (
 	},
 	'javascript-syntax' => {
 		type => 'raw',
-		url => 'http://www.vim.org/scripts/download_script.php?src_id=10728',
+		vimOrgId => 10728,
 		target => 'syntax/javascript.vim',
 	},
 	'javascript-indent' => {
@@ -120,7 +124,9 @@ if (system('grep','-q','pathogen#runtime_append_all_bundles',$ENV{HOME}.'/.vimrc
 }
 exit(0);
 
-# Purpose: Retrieve a file using wget
+# Purpose: Retrieve a file using wget.
+# Can be supplied with an integer instead of a URL, in which case it will resolve it
+# to fetch from vim.org
 sub get
 {
 	my $url = shift;
@@ -167,6 +173,10 @@ sub installPlugin
 	my $plugin = shift;
 	my $info = shift;
 	print "Installing: $plugin\n";
+	if ($info->{vimOrgId})
+	{
+		$info->{url} = 'http://www.vim.org/scripts/download_script.php?src_id='.$info->{vimOrgId};
+	}
 	# Older versions of git can't clone into an existing directory, so let git
 	# create it itself.
 	if ($info->{type} ne 'git')
