@@ -30,59 +30,59 @@ use Fatal qw(chdir mkpath);
 # http://www.vim.org/scripts/download_script.php?src_id=[VIMORGID]
 my %plugins = (
 	'perl-syntax' => {
-		type => 'raw',
-		target => 'syntax/perl.vim',
+		type     => 'raw',
+		target   => 'syntax/perl.vim',
 		vimOrgId => 11458,
 	},
 	'indentAnything' => {
-		type => 'tar.gz',
+		type     => 'tar.gz',
 		vimOrgId => 10228,
 	},
 	'icalendar' => {
-		type => 'raw',
-		target => 'syntax/icalendar.vim',
+		type     => 'raw',
+		target   => 'syntax/icalendar.vim',
 		vimOrgId => 5573,
 	},
 	'gettext-po' => {
-		type => 'raw',
-		target => 'ftplugin/po.vim',
+		type     => 'raw',
+		target   => 'ftplugin/po.vim',
 		vimOrgId => 4159,
 	},
 	'vim-markdown' => {
 		type => 'git',
-		url => 'http://github.com/tpope/vim-markdown.git',
+		url  => 'http://github.com/tpope/vim-markdown.git',
 	},
 	'taglist' => {
-		type => 'zip',
+		type     => 'zip',
 		vimOrgId => 7701,
 	},
 	'vim-mason' => {
-		type => 'raw',
+		type  => 'raw',
 		multi => [
 			{
 				target => 'syntax/oldperl.vim',
-				url => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/oldperl.vim',
+				url    => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/oldperl.vim',
 			},
 			{
 				target => 'syntax/mason.vim',
-				url => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/mason.vim',
+				url    => 'http://github.com/zerodogg/scriptbucket/raw/master/trivial/vim-mason/mason.vim',
 			}
 		]
 	},
 	'javascript-syntax' => {
-		type => 'raw',
+		type     => 'raw',
 		vimOrgId => 10728,
-		target => 'syntax/javascript.vim',
+		target   => 'syntax/javascript.vim',
 	},
 	'javascript-indent' => {
-		type => 'raw',
+		type   => 'raw',
 		# This is only available on the vim wiki (http://vim.wikia.com/wiki/Improved_Javascript_Indent_script_for_Vim)
 		# so I have mirrored the script file itself so that it can be installed by prepVim
-		url => 'http://zarb.org/~zerodogg/mirrored/javascript.vim',
+		url    => 'http://zarb.org/~zerodogg/mirrored/javascript.vim',
 		target => 'indent/javascript.vim',
 	},
 	'align' => {
-		type => 'vimball',
+		type     => 'vimball',
 		vimOrgId => 10110,
 	},
 );
