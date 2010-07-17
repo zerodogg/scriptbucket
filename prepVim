@@ -55,6 +55,10 @@ my %plugins = (
 	'taglist' => {
 		type     => 'zip',
 		vimOrgId => 7701,
+		# This ensures we skip installation if ctags-exuberant isn't installed
+		depsCheck   => sub {
+			return 'exuberant ctags is not installed' if not InPath('ctags-exuberant');
+		},
 	},
 	'vim-mason' => {
 		type  => 'raw',
@@ -192,6 +196,14 @@ sub installPlugin
 {
 	my $plugin = shift;
 	my $info = shift;
+	if(defined $info->{depsCheck})
+	{
+		if(my $error = $info->{depsCheck}->())
+		{
+			print "NOTE: Skipping \"$plugin\": missing dependencies: $error\n";
+			return;
+		}
+	}
 	print "Installing: $plugin\n";
 	if ($info->{vimOrgId})
 	{
