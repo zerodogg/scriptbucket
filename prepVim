@@ -89,6 +89,10 @@ my %plugins = (
 		type     => 'vimball',
 		vimOrgId => 10110,
 	},
+	'vim-git' => {
+		type => 'git',
+		url => 'http://github.com/tpope/vim-git.git'
+	},
 );
 
 # We need $HOME
