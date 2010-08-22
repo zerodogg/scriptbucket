@@ -33,6 +33,9 @@ COPYING for the full license text.
                         video podcast and play it.
     
     grandomwallpaper    Randomly sets a wallpaper for users using nautilus/GNOME.
+
+    gui_default_tango.vim A theme for gvim that makes gvim look like vim does by default in
+                          the gnome terminal with the tango colour scheme
     
     latexb              A simple utility script to help easily build LaTeX documents.
     
