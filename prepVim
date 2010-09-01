@@ -93,6 +93,15 @@ my %plugins = (
 		type => 'git',
 		url => 'http://github.com/tpope/vim-git.git'
 	},
+	'snipmate' => {
+		type => 'git',
+		url => 'http://github.com/msanders/snipmate.vim.git',
+	},
+	'MRU' => {
+		type => 'raw',
+		vimOrgId => 521,
+		target => 'plugin/MRU.vim',
+	},
 );
 
 # We need $HOME
@@ -143,6 +152,7 @@ sub get
 {
 	my $url = shift;
 	my $outfile = shift;
+	die('get() got undef url!') if not defined $url;
 	system(qw(wget --no-verbose -c --random-wait --retry-connrefused -t 0),'-O',$outfile,$url);
 	die("Download failed\n") if not -e $outfile;
 }
