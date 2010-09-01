@@ -99,7 +99,7 @@ my %plugins = (
 	},
 	'MRU' => {
 		type => 'raw',
-		vimOrgId => 521,
+		vimOrgId => 11919,
 		target => 'plugin/MRU.vim',
 	},
 );
