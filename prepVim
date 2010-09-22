@@ -97,6 +97,10 @@ my %plugins = (
 		type => 'git',
 		url => 'http://github.com/msanders/snipmate.vim.git',
 	},
+	'supertab' => {
+		type => 'git',
+		url => 'http://github.com/ervandew/supertab.git',
+	},
 	'MRU' => {
 		type => 'raw',
 		vimOrgId => 11919,
