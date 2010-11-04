@@ -157,7 +157,7 @@ sub get
 	my $url = shift;
 	my $outfile = shift;
 	die('get() got undef url!') if not defined $url;
-	system(qw(wget --no-verbose -c --random-wait --retry-connrefused -t 0),'-O',$outfile,$url);
+	system(qw(wget --no-check-certificate --no-verbose -c --random-wait --retry-connrefused -t 0),'-O',$outfile,$url);
 	die("Download failed\n") if not -e $outfile;
 }
 
