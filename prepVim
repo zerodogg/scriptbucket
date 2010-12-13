@@ -96,6 +96,11 @@ my %plugins = (
 	'snipmate' => {
 		type => 'git',
 		url => 'http://github.com/msanders/snipmate.vim.git',
+		postRun => sub
+		{
+			# I don't like the default JS snippets, so fetch my alternate one
+			get('http://zarb.org/~zerodogg/snipmate/javascript.snippets','snipmate/snippets/javascript.snippets',1);
+		},
 	},
 	'supertab' => {
 		type => 'git',
@@ -156,8 +161,14 @@ sub get
 {
 	my $url = shift;
 	my $outfile = shift;
+	my $fetchFresh = shift;
+	my @params = qw(wget --no-check-certificate --no-verbose --random-wait --retry-connrefused -t 0);
+	if(not $fetchFresh)
+	{
+		push(@params,'-c');
+	}
 	die('get() got undef url!') if not defined $url;
-	system(qw(wget --no-check-certificate --no-verbose -c --random-wait --retry-connrefused -t 0),'-O',$outfile,$url);
+	system(@params,'-O',$outfile,$url);
 	die("Download failed\n") if not -e $outfile;
 }
 
@@ -267,6 +278,10 @@ sub installPlugin
 			installPlugin_vimball($plugin,$info,$out);
 		}
 		unlink($out);
+	}
+	if ($info->{postRun})
+	{
+		$info->{postRun}->();
 	}
 	chdir('..');
 }
