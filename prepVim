@@ -98,8 +98,9 @@ my %plugins = (
 		url => 'http://github.com/msanders/snipmate.vim.git',
 		postRun => sub
 		{
-			# I don't like the default JS snippets, so fetch my alternate one
+			# I don't like some of the default snippets, so fetch alternate ones
 			get('http://zarb.org/~zerodogg/snipmate/javascript.snippets','snipmate/snippets/javascript.snippets',1);
+			get('http://zarb.org/~zerodogg/snipmate/perl.snippets','snipmate/snippets/perl.snippets',1);
 		},
 	},
 	'supertab' => {
@@ -110,6 +111,10 @@ my %plugins = (
 		type => 'raw',
 		vimOrgId => 11919,
 		target => 'plugin/MRU.vim',
+	},
+	'html5' => {
+		type => 'tar.gz',
+		vimOrgId => 13783,
 	},
 );
 
