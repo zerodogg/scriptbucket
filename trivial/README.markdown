@@ -18,6 +18,9 @@ COPYING for the full license text.
 
     Script:             Description:
     -------             ------------
+    fetchKitty          Fetches placeholder images from http://www.placekitten.com/
+                        for the sizes specified. Usage: ./fetchKitty [width]x[height]
+
     fix7digitalTags     Fixes the tags on MP3 files bought from the 7digital store.
                         For some reason they like adding "(LP Version)" to title tags,
                         this script strips that.
