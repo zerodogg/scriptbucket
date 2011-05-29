@@ -1,0 +1,127 @@
+#!/bin/bash
+# nwn_deluxe-modinstaller
+# Copyright (C) Eskild Hustvedt 2006
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+VERSION=0.1.1
+echo ""
+echo "Welcome to the NWN:Deluxe module installer."
+echo "NOTICE: You MUST install the 1.66 patch if you have not done so."
+echo "        either before or after the installation finishes"
+if ! type wine &>/dev/null; then
+	echo "Please install wine - it is required for the installation."
+	exit 1
+fi
+read -p "Press enter to begin"
+echo ""
+if [ ! -e ~/.wine/ ]; then
+	echo -n "Running wine to generate ~/.wine..."
+	touch blah.exe
+	wine blah.exe &>/dev/null
+	rm -f blah.exe
+	echo "done"
+else
+	echo "Found wine, is it okay that I mess around a bit with ~/.wine?"
+	echo "(it's all harmless I think)"
+	echo "Press enter for OK, ctrl+c to cancel"
+	read
+fi
+
+echo -n "Appending stuff to the registry..."
+if [ ! -e ~/.wine/dosdevices/ ]; then
+	echo "Please upgrade wine."
+	exit 1
+fi
+cat << EOF > $HOME/.wine/dosdevices/"c:"/nwn.reg
+[HKEY_LOCAL_MACHINE\Software]
+[HKEY_LOCAL_MACHINE\Software\BioWare]
+[HKEY_LOCAL_MACHINE\Software\BioWare\NWN]
+[HKEY_LOCAL_MACHINE\Software\BioWare\NWN\Neverwinter]
+"Location"="N:\\\\"
+[HKEY_LOCAL_MACHINE\Software\Microsoft]
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows]
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion]
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\App Paths]
+[HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\App Paths\\nwmain.exe]
+@="N:\\\\nwmain.exe"
+EOF
+wine regedit "c:\\nwn.reg" &>/dev/null
+if [ "$?" != "0" ]; then
+	echo "FAILED"
+	echo "regedit didn't work - please install a later version of wine."
+	exit 1
+else
+	echo "done"
+fi
+echo -n "Creating directories and files..."
+MYPWD=$PWD
+cd ~/.wine/dosdevices/
+echo -n "Attempting to detect neverwinter nights..."
+NWNPATHS="$HOME $HOME/games /usr/local/games/ /data/"
+for a in $NWNPATHS; do
+	if [ -d $a/nwn ]; then
+		NWN="$a/nwn"
+		break
+	fi
+done
+if [ "$NWN" == "" ]; then
+	echo "Please set the environment variable NWN to the path to NWN"
+	echo "and re-run me."
+	exit 1
+fi
+if [ -e ./"n:" ]; then	mv ./"n:" NWNTMP;fi
+ln -s $NWN ./"n:"
+echo "done"
+echo -n "Making backup of the miles dir..."
+mv $NWN/miles $NWN/miles-backup
+mkdir -p $NWN/miles
+echo "done"
+echo -n "Attempting to locate the CD-Rom..."
+ChkMountPoints="$NWN_CDROMPATH /mnt/cdrom /mnt/cdrom0 /mnt/cdrom1 /mnt/cdrom2 /mnt/dvdrom /mnt/dvdrom1 /mnt/dvd /mnt/burner /mnt/removable/ /cdrom /cdrom0 /cdrom1 /dvdrom /dvd /dvdrom1 /burner /media/cdrom /media/cdrom0 /media/cdrom1 /media/cdrom2 /media/dvdrom /media/dvdrom1 /media/dvd /media/burner /mnt/iso /media/iso"
+for a in $ChkMountPoints; do
+	if [ -d $a ]; then
+		mount $a &>/dev/null
+		if [ -e $a/setup.exe ] && [ -e $a/nwn.ico ]; then
+			NWN_CDROMPATH="$a"
+			break
+		fi
+	fi
+done
+if [ "$NWN_CDROMPATH" == "" ]; then
+	echo "Please set the environment variable NWN_CDROMPATH to the path to the"
+	echo "CD-Rom mountpoint containing the installer EXE."
+	exit 1
+fi
+echo "$NWN_CDROMPATH"
+echo ""
+echo "Okay, I will now launch wine to do the actual installing."
+echo "You will see a wine-style window pop up. Follow the instructions in that"
+echo "window and accept the defaults to install the modules."
+read -p "Press enter to start wine"
+echo "Starting wine, please wait..."
+echo "Wine messages logged to /tmp/nwn`whoami`modinstaller$$"
+wine $NWN_CDROMPATH/setup.exe &> /tmp/nwn`whoami`modinstaller$$
+if [ -e ./"NWNTMP" ]; then	rm -f ./"n:"; mv ./"NWNTMP" "n:";fi
+echo -n "Restoring miles directory..."
+rm -rf $NWN/miles
+mv $NWN/miles-backup $NWN/miles
+echo "done"
+echo ""
+echo "Okay, the modules are now installed. If you do have the 1.66 patch installed"
+echo "(or later) then the modules will now work."
+echo ""
+echo "Enjoy! :)"
+echo "Installer brought to you by David Holland and Eskild Hustvedt"

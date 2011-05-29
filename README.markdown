@@ -2,7 +2,8 @@
 
 This git repository contains various scripts written by Eskild Hustvedt
 that does not really merit their own git repo. See also the trivial/
-subdirectory for more (simpler/more trivial) scripts.
+subdirectory for more (simpler/more trivial) scripts and the linuxGames/
+subdirectory for Linux Gaming-related scripts.
 
 I make no guarantees about the scripts in this repository, use at your own
 risk. Should you find a bug however, feel free to report it and I will look
