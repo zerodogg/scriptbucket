@@ -18,6 +18,6 @@ if [ ! -e "$DIR" ]; then
 	echo "Usage: $0 [DIRECTORY]"
 fi
 for f in *; do
-	TITLE="`id3info "$f"  |grep TIT2|perl -pi -e 's/.*\): //; s/\s*\(LP\s*Version\)//gi'`"
+	TITLE="`id3info "$f"  |grep TIT2|perl -pi -e 's/.*\): //; s/\s*(\(LP\s*Version\)|Album Version)//gi'`"
 	eyeD3 -t "$TITLE" "$f"
 done
