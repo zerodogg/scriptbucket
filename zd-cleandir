@@ -30,6 +30,8 @@ for file in `find -maxdepth 1 $extraarg -mtime +7`; do
 		fi
 	fi
 	DATE="`ls $LSADD -l --time-style=long-iso "$file" | perl -pi -e 's#^\S+\s*\d+\s+\S+\s+\S+\s+\S+\s+##; s#\s*\d+:.*$##; s#-\d+$##;s#-#/#g;'`"
+	# Alternate syntax
+#	DATE="`ls $LSADD -l --time-style=long-iso "$file" | perl -pi -e 's#^\S+\s*\d+\s+\S+\s+\S+\s+\S+\s+##; s#\s*\d+:.*$##;'`"
 	mkdir -v -p "$DATE"
 	if [ -e "$DATE/$file" ]; then
 		mv -v "$file" "$DATE/$file.$(date +%s)"
