@@ -116,6 +116,10 @@ my %plugins = (
 		type => 'tar.gz',
 		vimOrgId => 13783,
 	},
+	'vimoutliner' => {
+		url => 'https://github.com/downloads/vimoutliner/vimoutliner/vimoutliner-0.3.6.tgz',
+		type => 'tar.gz'
+	},
 );
 
 # We need $HOME
