@@ -1,0 +1,38 @@
+#!/bin/bash
+# Copyright (C) Eskild Hustvedt 2011
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+TARGET="$HOME/.config/autostart/gnome-keyring-ssh.desktop"
+if [ -e "$TARGET" ]; then
+	echo "Warning: Will overwrite $TARGET"
+	read -p "Press enter to continue, ^C to cancel"
+fi
+mkdir -vp "$HOME/.config/autostart"
+cat << EOF > "$TARGET"
+[Desktop Entry]
+Type=Application
+Name=SSH Key Agent
+Comment=GNOME Keyring: SSH Agent
+Exec=/usr/bin/gnome-keyring-daemon --start --components=ssh
+OnlyShowIn=GNOME;LXDE;XFCE;
+X-GNOME-Autostart-Phase=Initialization
+X-GNOME-AutoRestart=false
+X-GNOME-Autostart-Notify=true
+X-GNOME-Bugzilla-Bugzilla=GNOME
+X-GNOME-Bugzilla-Product=gnome-keyring
+X-GNOME-Bugzilla-Component=general
+X-GNOME-Bugzilla-Version=3.0.3
+X-GNOME-Autostart-enabled=false
+EOF

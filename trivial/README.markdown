@@ -16,23 +16,25 @@ COPYING for the full license text.
 
 ### Quick description of the scripts:
 
-    Script:             Description:
-    -------             ------------
-    fetchKitty          Fetches placeholder images from http://www.placekitten.com/
-                        for the sizes specified. Usage: ./fetchKitty [width]x[height]
+    Script:               Description:
+    -------               ------------
+    disableGnomeSSHagent  Disables the SSH agent component of the GNOME keyring
 
-    fix7digitalTags     Fixes the tags on MP3 files bought from the 7digital store.
-                        For some reason they like adding "(LP Version)" to title tags,
-                        this script strips that.
-    
-    gl                  A script to query google from the command-line. Only useful to query
-                        the google utilities (such as exchange rates),
-                        ie. ./gl "1 USD in NOK".
+    fetchKitty            Fetches placeholder images from http://www.placekitten.com/
+                          for the sizes specified. Usage: ./fetchKitty [width]x[height]
 
-    optimizeFF          Optimize firefox profiles by running the sqlite3 VACUUM command on all
-                        sqlite3 databases in the profiles.
+    fix7digitalTags       Fixes the tags on MP3 files bought from the 7digital store.
+                          For some reason they like adding "(LP Version)" to title tags,
+                          this script strips that.
     
-    vim-mason           A quick and dirty hack to get mason syntax hilighting working in
-                        newer versions of vim
+    gl                    A script to query google from the command-line. Only useful to query
+                          the google utilities (such as exchange rates),
+                          ie. ./gl "1 USD in NOK".
+
+    optimizeFF            Optimize firefox profiles by running the sqlite3 VACUUM command on all
+                          sqlite3 databases in the profiles.
+    
+    vim-mason             A quick and dirty hack to get mason syntax hilighting working in
+                          newer versions of vim
 
 vim: set expandtab :
