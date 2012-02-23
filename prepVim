@@ -30,9 +30,8 @@ use Fatal qw(chdir mkpath);
 # http://www.vim.org/scripts/download_script.php?src_id=[VIMORGID]
 my %plugins = (
 	'perl-syntax' => {
-		type     => 'raw',
-		target   => 'syntax/perl.vim',
-		vimOrgId => 11458,
+		type     => 'git',
+		url      => 'https://github.com/rkitover/perl-vim-mxd.git',
 	},
 	'indentAnything' => {
 		type     => 'tar.gz',
