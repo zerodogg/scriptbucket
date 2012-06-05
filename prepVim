@@ -59,6 +59,10 @@ my %plugins = (
 			return 'exuberant ctags is not installed' if not InPath('ctags-exuberant');
 		},
 	},
+    'vim-latex-suite' => {
+        type => 'tar.gz',
+        url => 'http://downloads.sourceforge.net/project/vim-latex/snapshots/vim-latex-1.8.23-20120125.768-git8b62284.tar.gz',
+    },
 	'vim-mason' => {
 		type  => 'raw',
 		multi => [
@@ -90,11 +94,11 @@ my %plugins = (
 	},
 	'vim-git' => {
 		type => 'git',
-		url => 'http://github.com/tpope/vim-git.git'
+		url => 'https://github.com/tpope/vim-git.git'
 	},
 	'snipmate' => {
 		type => 'git',
-		url => 'http://github.com/msanders/snipmate.vim.git',
+		url => 'https://github.com/msanders/snipmate.vim.git',
 		postRun => sub
 		{
 			# I don't like some of the default snippets, so fetch alternate ones
@@ -119,6 +123,65 @@ my %plugins = (
 		url => 'https://github.com/downloads/vimoutliner/vimoutliner/vimoutliner-0.3.6.tgz',
 		type => 'tar.gz'
 	},
+    solarized => {
+        url => 'https://github.com/altercation/vim-colors-solarized.git',
+        type => 'git',
+    },
+    'sass-syntax' =>
+    {
+        type => 'raw',
+        multi => [
+            {
+                target => 'syntax/sass.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/syntax/sass.vim'
+            },
+            {
+                target => 'syntax/scss.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/syntax/scss.vim',
+            },
+            {
+                target => 'ftplugin/sass.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/ftplugin/sass.vim'
+            },
+            {
+                target => 'ftplugin/scss.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/ftplugin/scss.vim'
+            },
+            {
+                target => 'indent/scss.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/indent/scss.vim'
+            },
+            {
+                target => 'indent/sass.vim',
+                url => 'http://vim.googlecode.com/hg-history/vim73/runtime/indent/sass.vim'
+            },
+        ],
+        postRun => sub
+        {
+            out('filetype.vim',"au BufNewFile,BufRead *.sass setf sass\n au BufNewFile,BufRead *.scss setf scss\n");
+        }
+    },
+    'gtk-vim-syntax' => {
+        type => 'tar.gz',
+        vimOrgId => 15217,
+        postRun => sub
+        {
+            move('gtk-vim-syntax','syntax');
+            needDir($ENV{HOME}.'/.vim/after/syntax/');
+            my $text = '';
+            # sqlite3 is from c-sqlite-syntax
+            foreach my $type (qw(glib gobject gdk gio gdkpixbuf gtk gstreamer libsoup sqlite_c))
+            {
+                $text .= "runtime! syntax/$type.vim\n";
+            }
+            out($ENV{HOME}.'/.vim/after/syntax/c.vim',$text);
+
+        },
+    },
+    'sqlite-c-syntax' => {
+        type => 'zip',
+        vimOrgId => 9295,
+    },
 );
 
 # We need $HOME
