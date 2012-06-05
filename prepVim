@@ -180,6 +180,18 @@ sub get
 	die("Download failed\n") if not -e $outfile;
 }
 
+# Purpose: Write text to a file
+# Usage: out(target,text);
+# (target will be overwritten if it exists)
+sub out
+{
+    my $target = shift;
+    my $text = shift;
+    open(my $out,'>',$target) or die("Failed to open $target for writing: $!\n");
+    print {$out} $text;
+    close($out);
+}
+
 # Purpose: Recreate a directory
 sub needFreshDir
 {
