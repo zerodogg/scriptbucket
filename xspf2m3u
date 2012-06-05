@@ -1,0 +1,85 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use XML::Fast;
+use 5.010;
+
+my $file = shift;
+die("USAGE: xspf2m3u /path/to/playlist.xspf\n") if not $file;
+die("$file: does not end in .xspf\n") if $file !~ /\.xspf$/;
+die("$file: does not exist or is unreadable\n") if not -r $file;
+
+# Load the file
+open(my $i,'<:utf8',$file);
+my $c;
+$c .= $_ while(<$i>);
+close($i);
+
+# Parse the xml
+my $list = xml2hash($c);
+# Fetch the interesting parts
+foreach my $p (qw(playlist trackList track))
+{
+    if ($list->{$p})
+    {
+        $list = $list->{$p};
+    }
+    else
+    {
+        die("Failed attempting to retrieve $p\n");
+    }
+}
+die("Unexpected data\n") if(ref($list) ne 'ARRAY');
+
+# Scalar that will hold the file
+my $out = '#EXTM3U'."\n";
+
+foreach my $t (@{$list})
+{
+    # Extended data header, with seconds
+    my $header = '#EXTINF:';
+    my $sec = -1;
+    if ($t->{duration})
+    {
+        $sec = $t->{duration} / 1000;
+    }
+    $header .= $sec.', ';
+
+    # Ensure they're not undef
+    $t->{creator} //= '';
+    $t->{title} //='';
+
+    # Ensure there's no newlines in the fields
+    chomp($t->{creator});
+    chomp($t->{title});
+
+    # Append them
+    $header .= $t->{creator}.' - '.$t->{title};
+
+    if(not $t->{location})
+    {
+        # Skip empty entry
+        next;
+    }
+    # newlines are legal in filenames, but will probably make anything
+    # attempting to parse this file crash and burn, so skip filenames with
+    # newlines
+    if ($t->{location} =~ /\n/)
+    {
+        next;
+    }
+
+    # Remove file:// from the location
+    (my $file = $t->{location}) =~ s{^file://}{};
+    # Add to output
+    $out .= $header."\n";
+    $out .= $file."\n\n";
+}
+
+# Write data to the same path, but with an m3u extension
+(my $outfile = $file) =~ s/\.xspf$/\.m3u/;
+open(my $o,'>:utf8',$outfile) or die("Failed to open $outfile for writing: $!\n");
+print {$o} $out;
+close($o);
+
+print "Wrote $outfile\n";
