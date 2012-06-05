@@ -301,7 +301,8 @@ sub installPlugin_git
 	my $info = shift;
 	chdir($bundleDir);
 	rmDirTree('./'.$plugin);
-	system('git','clone','-q',$info->{url},'./'.$plugin) and die("git failed to clone the repository.\n");
+	system('git','clone','--depth',1,'-q',$info->{url},'./'.$plugin) and die("git failed to clone the repository.\n");
+    print "Made a shallow clone of ".$info->{url}."\n";
 }
 
 # Purpose: Install a 'raw' plugin (ie. not archived or git)
