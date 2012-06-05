@@ -27,6 +27,10 @@ COPYING for the full license text.
     dagsnytt            A script to fetch the latest "dagsnytt" (Norwegian NRK radio
                         news) podcast and play it. Can also fetch the latest "politisk
                         kvarter".
+
+    diskcheck.sh        A simple script intended to be run from cron.hourly
+                        that checks if any partitions have less than 1GiB of
+                        free space and warns you via e-mail if it does.
     
     filenamecleaner     A simple script that helps clean up nasty filenames.
     
