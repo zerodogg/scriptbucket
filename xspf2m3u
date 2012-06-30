@@ -29,6 +29,10 @@ foreach my $p (qw(playlist trackList track))
         die("Failed attempting to retrieve $p\n");
     }
 }
+if(ref($list) eq 'HASH')
+{
+    $list = [ $list ];
+}
 die("Unexpected data\n") if(ref($list) ne 'ARRAY');
 
 # Scalar that will hold the file
