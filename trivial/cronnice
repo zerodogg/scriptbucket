@@ -1,0 +1,7 @@
+#!/bin/sh
+# Run the command with the lowest process priority, on a single
+# CPU and with the lowest I/O priority
+# vim: set ft=sh :
+BINDIR=/bin
+[ -x /usr/bin/nice ] && BINDIR=/usr/bin
+exec $BINDIR/nice -n19 $BINDIR/taskset -c 0 /usr/bin/ionice -c 3 "$@"

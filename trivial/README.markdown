@@ -18,6 +18,9 @@ COPYING for the full license text.
 
     Script:               Description:
     -------               ------------
+    cronnice              Run a command as nicely as possible (with niceness
+                          19, lowest I/O priority, on a single CPU/core)
+
     disableGnomeSSHagent  Disables the SSH agent component of the GNOME keyring
 
     fetchKitty            Fetches placeholder images from http://www.placekitten.com/
