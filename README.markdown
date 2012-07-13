@@ -23,6 +23,9 @@ COPYING for the full license text.
     
     animetool           A simple script to assist with watching TV/Anime series
                         and rename files to sane filenames.
+
+    cookiesTxtToPhantom A script to convert cookies.txt files to a cookie
+                        format usable by phantomjs
     
     dagsnytt            A script to fetch the latest "dagsnytt" (Norwegian NRK radio
                         news) podcast and play it. Can also fetch the latest "politisk
