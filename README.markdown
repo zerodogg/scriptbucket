@@ -24,6 +24,10 @@ COPYING for the full license text.
     animetool           A simple script to assist with watching TV/Anime series
                         and rename files to sane filenames.
 
+    antiSocialNewsblur.user.js
+                        A userscript/greasemonkey script to remove the social
+                        features ("blurblog") from Newsblur
+
     cookiesTxtToPhantom A script to convert cookies.txt files to a cookie
                         format usable by phantomjs
     
