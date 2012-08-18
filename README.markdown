@@ -53,6 +53,9 @@ COPYING for the full license text.
     
     monitorgrowth       Monitor the rate at which a file is growing.
 
+    pbJSON2HTML         A script that converts a pinboard.in bookmark backup
+                        from JSON to a usable HTML file
+
     prepVim             A script that downloads and installs vim plugins. Uses pathogen
                         to make sure ~/.vim is not cluttered.
     

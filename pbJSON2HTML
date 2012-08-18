@@ -1,0 +1,93 @@
+#!/usr/bin/perl
+# Copyright (C) Eskild Hustvedt 2012
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+use 5.010;
+use strict;
+use warnings;
+use JSON qw(decode_json);
+use utf8;
+
+$| = 1;
+
+my $usage = 'USAGE: '.$0.' infile.json outfile.html'."\n";
+
+my $infile = shift or die($usage);
+my $outfile = shift or die($usage);
+die($usage) if @ARGV;
+die($outfile.': already exists'."\n") if -e $outfile;
+
+open(my $in,'<:encoding(UTF-8)',$infile);
+undef $/;
+my $json = decode_json(<$in>);
+close($in);
+
+open(my $out,'>:encoding(UTF-8)',$outfile);
+print {$out} '<!DOCTYPE html><html><head><title>Pinboard.in Bookmarks backup</title><meta http-equiv="content-type" content="text/html; charset=utf-8" />'."\n";
+print {$out} '<!-- File written by pbJSON2HTML -->'."\n";
+print {$out} '<style type="text/css">
+body
+{
+    font-family:sans-serif;
+    font-size:14px;
+}
+.bookmark
+{
+    margin-bottom:1em;
+    margin-left:auto;
+    margin-right:auto;
+    width:600px;
+}
+.private
+{
+    background-color: #DDD;
+}
+.tags
+{
+    color: #A51;
+}
+.toread a, .toread a:visited, .toread a:active
+{
+    color: #B41;
+}
+a, a:visited, a:active
+{
+    color: #51A;
+    text-decoration:none;
+}
+.info
+{
+    color: #555;
+}
+.meta
+{
+    color: #777;
+}
+</style></head><body>';
+print {$out} "\n";
+foreach my $ent (@{$json})
+{
+    print {$out} '<div class="bookmark'.($ent->{toread} eq 'yes' ? ' toread' : '').($ent->{shared} eq 'no' ? ' private' : '').'">';
+    print {$out} '<a href="'.$ent->{href}.'">'.$ent->{description}.'</a>';
+    if ($ent->{extended})
+    {
+        print {$out} '<div class="info">'.$ent->{extended}.'</div>';
+    }
+    print {$out} '<div class="tags">'.$ent->{tags}.'</div>';
+    print {$out} '<div class="meta">'.$ent->{time}.'</div>';
+    print {$out} '</div>';
+    print {$out} "\n";
+}
+print {$out} '</body></html>';
+close($out);
