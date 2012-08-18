@@ -19,9 +19,13 @@ extraarg='-type f'
 
 if [ "$1" == "all" ]; then
 	extraarg=""
+    shift
+fi
+if [ "$1" != "full" ]; then
+    extraarg="$extraarg -mtime +7"
 fi
 
-for file in `find -maxdepth 1 $extraarg -mtime +7`; do
+for file in `find -maxdepth 1 $extraarg`; do
 	LSADD=""
 	if [ -d "$file" ]; then
 		LSADD="-d"
