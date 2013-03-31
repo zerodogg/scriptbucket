@@ -1,0 +1,199 @@
+#!/bin/bash
+# gitannex-install
+# Installs the standalone build of git-annex
+# Copyright (C) Eskild Hustvedt 2013
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Reads a file if it exists, otherwise outputs an empty string
+function catFile ()
+{
+    if [ -e "$1" ]; then
+        cat "$1"
+    else
+        echo ""
+    fi
+}
+
+FORCE=0
+OVERWRITE=0
+CHECK=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --force|-f)
+            FORCE=1
+            ;;
+        --overwrite)
+            OVERWRITE=1
+            ;;
+        --check)
+            CHECK=1
+            ;;
+        --help|-h)
+            cat << __EOF__
+ gitannex-install - installs or updates the standalone git-annex build
+
+ Usage: gitannex-install [OPTIONS]
+
+ Options:
+    --force     - Force an update even if it isn't needed
+    --overwrite - Perform unsafe overwrites of existing git-annex files in \$PATH
+    --check     - Check for updates, but don't install them
+__EOF__
+        exit 0
+        ;;
+        *)
+            echo "Unknown parameter: $1"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Store the value of PATH for use when writing the wrappers
+SEARCHPATH="$PATH"
+# The target installation directory
+INSTALLDIR="$HOME/.local/share/git-annex"
+# Install globally to /usr/local if running as root
+if [ "$UID" == "0" ]; then
+    INSTALLDIR="/usr/local/git-annex"
+    SEARCHPATH="/usr/local/bin:$PATH"
+    echo "Running as root, will install globally in /usr/local"
+fi
+# Store the version number in this file
+VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
+# The mode we're running in
+MODE="upgrade"
+
+# Scrape the version number from git-annex's news page
+echo -n "Checking for the latest version..."
+VERSION="$( wget -q -O- 'http://git-annex.branchable.com/news/' 2>/dev/null | grep -i version | head -n1 | sed -e 's/<[^>]*>//g;s/.*version //i;' )"
+CURRENT_VERSION="$( catFile "$VERSIONFILE" )"
+# If we failed to scrape it, then exit
+if [ "$VERSION" == "" ]; then
+    echo "failed"
+    exit 1
+else
+    echo "done - $VERSION"
+fi
+# If the version matches the installed one, then just exit now
+if [ "$VERSION" == "$CURRENT_VERSION" ] && [ "$FORCE" == "0" ]; then
+    echo "git-annex is up to date"
+    exit 0
+elif [ "$CURRENT_VERSION" == "" ]; then
+    MODE="install"
+fi
+if [ "$CHECK" == "1" ]; then
+    if [ "$MODE" == "install" ]; then
+        echo "Would install git-annex $VERSION"
+    else
+        echo "Would update git-annex from $CURRENT_VERSION to $VERSION"
+    fi
+    exit 0
+fi
+# Temporary file to save the tarball to
+TEMPFILE="$(mktemp /tmp/git-annex-standalone-package.XXXXXXXXXXX.tar.gz)"
+# Download the tarball
+echo "Downloading git-annex $VERSION:"
+wget -O "$TEMPFILE" "http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz"
+ret=$?
+if [ "$ret" != "0" ]; then
+    rm -f "$TEMPFILE"
+    echo "Download failed, exiting"
+    exit 1
+fi
+# Recreate the installation target directory
+rm -rf "$INSTALLDIR"
+mkdir -p "$INSTALLDIR"
+cd "$INSTALLDIR"
+# Install git-annex
+if [ "$MODE" == "install" ]; then
+    echo -n "Installing..."
+else
+    echo -n "Upgrading..."
+fi
+# Extract it
+tar -zxf "$TEMPFILE"
+echo -n "."
+# Move extracted files into the install directory
+mv git-annex.linux/* .
+echo -n "."
+# Remove the temporary extracted directory
+rm -rf git-annex.linux
+# Remove the tarball
+rm -f "$TEMPFILE"
+# Write the version number
+echo "$VERSION" > "$VERSIONFILE"
+echo -n "."
+IFS=":"
+FOUND_DIR=0
+# Find a directory in the SEARCHPATH (PATH) that is writeable
+for pathDir in $SEARCHPATH; do
+    if [ -w "$pathDir" ]; then
+        # Write a wrapper script for git-annex and git-annex-webapp into
+        # the path
+        for file in git-annex git-annex-webapp; do
+            if [ -e "$pathDir/$file" ]; then
+                if [ "$OVERWRITE" == "1" ]; then
+                    rm -f "$pathDir/$file"
+                elif ! grep -q 'Installed by gitannex-install' "$pathDir/$file"; then
+                    echo ""
+                    echo "WARNING: $pathDir/$file: already exists - skipped"
+                    echo "You may want to manually remove this file and then re-run this script."
+                    echo "(or re-run gitannex-install with --force --overwrite)"
+                    continue
+                fi
+            fi
+            FOUND_DIR=1
+            echo -n "."
+            cat << __EOF__ > "$pathDir/$file"
+#!/bin/sh
+# Installed by gitannex-install
+exec "$INSTALLDIR/$file" "\$@"
+__EOF__
+            chmod 755 "$pathDir/$file"
+            ln -s "$pathDir/$file" "$INSTALLDIR/.$file-wrapper"
+        done
+        break
+    fi
+done
+echo -n "."
+cat << __EOF__ > "$INSTALLDIR/uninstall"
+#!/bin/sh
+# Uninstall script for gitannex-install
+echo -n "Uninstalling"
+cd /
+echo -n "."
+[ -e "$INSTALLDIR/.git-annex-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-wrapper"\`"
+echo -n "."
+[ -e "$INSTALLDIR/.git-annex-webapp-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-webapp-wrapper"\`"
+echo -n "."
+rm -rf "$INSTALLDIR"
+echo -n "."
+echo "done"
+__EOF__
+chmod 700 "$INSTALLDIR/uninstall"
+echo "done"
+if [ "$MODE" == "install" ]; then
+    echo "git-annex version $VERSION has been installed"
+else
+    echo "git-annex has been upgraded from $CURRENT_VERSION to $VERSION"
+fi
+if [ "$FOUND_DIR" == "0" ]; then
+    echo "Warning: failed to write wrapper scripts in your PATH"
+    echo "git-annex most likely won't work, you will need to create wrappers for"
+    echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-webapp"
+    echo "manually"
+    exit 1
+fi

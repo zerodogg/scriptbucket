@@ -44,6 +44,9 @@ COPYING for the full license text.
     getdagsrevyen       A script to fetch the latest dagsrevyen (Norwegian NRK TV news)
                         video podcast and play it.
     
+    gitannex-install    A script that downloads and installs (or updates) the
+                        git-annex standalone builds.
+
     grandomwallpaper    Randomly sets a wallpaper for users using nautilus/GNOME.
 
     gui_default_tango.vim A theme for gvim that makes gvim look like vim does by default in
