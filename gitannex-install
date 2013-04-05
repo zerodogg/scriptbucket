@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # gitannex-install
 # Installs the standalone build of git-annex
 # Copyright (C) Eskild Hustvedt 2013
@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Reads a file if it exists, otherwise outputs an empty string
-function catFile ()
+catFile ()
 {
     if [ -e "$1" ]; then
         cat "$1"
@@ -26,9 +26,36 @@ function catFile ()
     fi
 }
 
+# Store the value of PATH for use when writing the wrappers
+SEARCHPATH="$PATH"
+# The target installation directory
+INSTALLDIR="$HOME/.local/share/git-annex"
+# Install globally to /usr/local if running as root
+if [ "$(id -ru)" = "0" ]; then
+    INSTALLDIR="/usr/local/git-annex"
+    SEARCHPATH="/usr/local/bin:$PATH"
+    echo "Running as root, will install globally in /usr/local"
+fi
+# Store the version number in this file
+VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
+# The mode we're running in
+MODE="upgrade"
+# The URL to download from (will be different for --daily)
+if [ "$(uname -m)" = "x86_64" ]; then
+    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz"
+else
+    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz"
+fi
+# 1 if the user wants to force an install
 FORCE=0
+# 1 if the user wants to force-overwrite files
 OVERWRITE=0
+# 1 if the user just wants to check if an update is available
 CHECK=0
+# 1 if the user wants the daily build, rather than the release build
+DAILY=0
+
+# Parse command-line parameters
 while [ $# -gt 0 ]; do
     case "$1" in
         --force|-f)
@@ -40,6 +67,22 @@ while [ $# -gt 0 ]; do
         --check)
             CHECK=1
             ;;
+        --daily)
+            if [ "$(uname -m)" = "x86_64" ]; then
+                GET_URL="http://downloads.kitenet.net/git-annex/autobuild/amd64/git-annex-standalone-amd64.tar.gz"
+            else
+                GET_URL="http://downloads.kitenet.net/git-annex/autobuild/i386/git-annex-standalone-i386.tar.gz"
+            fi
+            DAILY=1
+            ;;
+        --uninstall)
+            if [ -x "$INSTALLDIR/uninstall" ]; then
+                exec "$INSTALLDIR/uninstall"
+            else
+                echo "Could not locate any uninstall scripts to run."
+                exit 0
+            fi
+            ;;
         --help|-h)
             cat << __EOF__
  gitannex-install - installs or updates the standalone git-annex build
@@ -47,9 +90,12 @@ while [ $# -gt 0 ]; do
  Usage: gitannex-install [OPTIONS]
 
  Options:
-    --force     - Force an update even if it isn't needed
+    --force, -f - Force an update even if it isn't needed
     --overwrite - Perform unsafe overwrites of existing git-annex files in \$PATH
     --check     - Check for updates, but don't install them
+    --daily     - Install the daily snapshot builds instead of the release builds
+    --uninstall - Uninstall an already installed git-annex
+    --help      - Display this help screen
 __EOF__
         exit 0
         ;;
@@ -61,41 +107,34 @@ __EOF__
     shift
 done
 
-# Store the value of PATH for use when writing the wrappers
-SEARCHPATH="$PATH"
-# The target installation directory
-INSTALLDIR="$HOME/.local/share/git-annex"
-# Install globally to /usr/local if running as root
-if [ "$UID" == "0" ]; then
-    INSTALLDIR="/usr/local/git-annex"
-    SEARCHPATH="/usr/local/bin:$PATH"
-    echo "Running as root, will install globally in /usr/local"
-fi
-# Store the version number in this file
-VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
-# The mode we're running in
-MODE="upgrade"
 
-# Scrape the version number from git-annex's news page
-echo -n "Checking for the latest version..."
-VERSION="$( wget -q -O- 'http://git-annex.branchable.com/news/' 2>/dev/null | grep -i version | head -n1 | sed -e 's/<[^>]*>//g;s/.*version //i;' )"
+printf "%s" "Checking for the latest version..."
+if [ "$DAILY" = "0" ]; then
+    # Scrape the version number from git-annex's news page
+    VERSION="$( wget -q -O- 'http://git-annex.branchable.com/news/' 2>/dev/null | grep -i version | head -n1 | sed -e 's/<[^>]*>//g;s/.*version //i;' )"
+else
+    # Use todays date as the version number
+    VERSION="daily-$(date +%Y-%m-%d)"
+fi
+# Read the currently installed version, if any
 CURRENT_VERSION="$( catFile "$VERSIONFILE" )"
-# If we failed to scrape it, then exit
-if [ "$VERSION" == "" ]; then
+# If we failed to get any version number, exit
+if [ "$VERSION" = "" ]; then
     echo "failed"
     exit 1
 else
     echo "done - $VERSION"
 fi
-# If the version matches the installed one, then just exit now
-if [ "$VERSION" == "$CURRENT_VERSION" ] && [ "$FORCE" == "0" ]; then
+# If the version matches the installed one, then just exit now (unless the user
+# wants to --force us to continue)
+if [ "$VERSION" = "$CURRENT_VERSION" ] && [ "$FORCE" = "0" ]; then
     echo "git-annex is up to date"
     exit 0
-elif [ "$CURRENT_VERSION" == "" ]; then
+elif [ "$CURRENT_VERSION" = "" ]; then
     MODE="install"
 fi
-if [ "$CHECK" == "1" ]; then
-    if [ "$MODE" == "install" ]; then
+if [ "$CHECK" = "1" ]; then
+    if [ "$MODE" = "install" ]; then
         echo "Would install git-annex $VERSION"
     else
         echo "Would update git-annex from $CURRENT_VERSION to $VERSION"
@@ -106,7 +145,7 @@ fi
 TEMPFILE="$(mktemp /tmp/git-annex-standalone-package.XXXXXXXXXXX.tar.gz)"
 # Download the tarball
 echo "Downloading git-annex $VERSION:"
-wget -O "$TEMPFILE" "http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz"
+wget -O "$TEMPFILE" "$GET_URL"
 ret=$?
 if [ "$ret" != "0" ]; then
     rm -f "$TEMPFILE"
@@ -118,35 +157,38 @@ rm -rf "$INSTALLDIR"
 mkdir -p "$INSTALLDIR"
 cd "$INSTALLDIR"
 # Install git-annex
-if [ "$MODE" == "install" ]; then
-    echo -n "Installing..."
+if [ "$MODE" = "install" ]; then
+    printf "%s" "Installing..."
 else
-    echo -n "Upgrading..."
+    printf "%s" "Upgrading..."
 fi
 # Extract it
 tar -zxf "$TEMPFILE"
-echo -n "."
+printf "%s" "."
 # Move extracted files into the install directory
 mv git-annex.linux/* .
-echo -n "."
+printf "%s" "."
 # Remove the temporary extracted directory
 rm -rf git-annex.linux
 # Remove the tarball
 rm -f "$TEMPFILE"
 # Write the version number
 echo "$VERSION" > "$VERSIONFILE"
-echo -n "."
+printf "%s" "."
+# Find a directory in the SEARCHPATH (PATH) that is writeable
 IFS=":"
 FOUND_DIR=0
-# Find a directory in the SEARCHPATH (PATH) that is writeable
 for pathDir in $SEARCHPATH; do
     if [ -w "$pathDir" ]; then
-        # Write a wrapper script for git-annex and git-annex-webapp into
+        # Write a wrapper script for git-annex and git-annex-shell into
         # the path
-        for file in git-annex git-annex-webapp; do
+        for file in git-annex git-annex-shell; do
             if [ -e "$pathDir/$file" ]; then
-                if [ "$OVERWRITE" == "1" ]; then
+                # If the file exists and the user wants to --overwrite, just remove it
+                if [ "$OVERWRITE" = "1" ]; then
                     rm -f "$pathDir/$file"
+                # Check if the file was written by this script, if it wasn't then
+                # skip it with a warning.
                 elif ! grep -q 'Installed by gitannex-install' "$pathDir/$file"; then
                     echo ""
                     echo "WARNING: $pathDir/$file: already exists - skipped"
@@ -156,44 +198,48 @@ for pathDir in $SEARCHPATH; do
                 fi
             fi
             FOUND_DIR=1
-            echo -n "."
+            printf "%s" "."
+            # Write the wrapper script
             cat << __EOF__ > "$pathDir/$file"
 #!/bin/sh
 # Installed by gitannex-install
 exec "$INSTALLDIR/$file" "\$@"
 __EOF__
             chmod 755 "$pathDir/$file"
+            # Link the wrapper script into the install directory, so that the uninstall
+            # script knows where to look for it
             ln -s "$pathDir/$file" "$INSTALLDIR/.$file-wrapper"
         done
         break
     fi
 done
-echo -n "."
+printf "%s" "."
+# Write the uninstall script
 cat << __EOF__ > "$INSTALLDIR/uninstall"
 #!/bin/sh
 # Uninstall script for gitannex-install
-echo -n "Uninstalling"
+printf "%s" "Uninstalling"
 cd /
-echo -n "."
+printf "%s" "."
 [ -e "$INSTALLDIR/.git-annex-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-wrapper"\`"
-echo -n "."
-[ -e "$INSTALLDIR/.git-annex-webapp-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-webapp-wrapper"\`"
-echo -n "."
+printf "%s" "."
+[ -e "$INSTALLDIR/.git-annex-shell-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-shell-wrapper"\`"
+printf "%s" "."
 rm -rf "$INSTALLDIR"
-echo -n "."
+printf "%s" "."
 echo "done"
 __EOF__
 chmod 700 "$INSTALLDIR/uninstall"
 echo "done"
-if [ "$MODE" == "install" ]; then
+if [ "$MODE" = "install" ]; then
     echo "git-annex version $VERSION has been installed"
 else
     echo "git-annex has been upgraded from $CURRENT_VERSION to $VERSION"
 fi
-if [ "$FOUND_DIR" == "0" ]; then
+if [ "$FOUND_DIR" = "0" ]; then
     echo "Warning: failed to write wrapper scripts in your PATH"
     echo "git-annex most likely won't work, you will need to create wrappers for"
-    echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-webapp"
+    echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-shell"
     echo "manually"
     exit 1
 fi
