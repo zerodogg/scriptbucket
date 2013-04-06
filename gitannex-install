@@ -169,7 +169,7 @@ printf "%s" "."
 mv git-annex.linux/* .
 printf "%s" "."
 # Remove the temporary extracted directory
-rm -rf git-annex.linux
+rmdir git-annex.linux
 # Remove the tarball
 rm -f "$TEMPFILE"
 # Write the version number
