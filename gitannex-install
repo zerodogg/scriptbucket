@@ -175,10 +175,28 @@ rm -f "$TEMPFILE"
 # Write the version number
 echo "$VERSION" > "$VERSIONFILE"
 printf "%s" "."
+# This ssh's to localhost as the current user, if possible, and then retrieves the
+# the PATH for that shell. This is used to ensure that the wrapper scripts get
+# put into a directory that is present in the PATH used for non-interactive
+# shells.
+NONINTERACTIVE_SEARCHPATH="$( ssh -o ForwardAgent=no -o ForwardX11=no -o ConnectTimeout=1 -o BatchMode=yes "$(id -un)@127.0.0.1" 'echo "$PATH"' 2>&1 | tail -n1)"
+if [ "$NONINTERACTIVE_SEARCHPATH" != "" ]; then
+    SEARCHPATH="$NONINTERACTIVE_SEARCHPATH:---:$SEARCHPATH"
+fi
+printf "%s" "."
 # Find a directory in the SEARCHPATH (PATH) that is writeable
 IFS=":"
 FOUND_DIR=0
 for pathDir in $SEARCHPATH; do
+    if [ "$pathDir" = "---" ]; then
+        echo ""
+        echo "WARNING: Failed to find a writable directory in the PATH for"
+        echo "non-interactive shells. git-annex may not work over ssh."
+        echo "This could be because you don't have any directory in the PATH for"
+        echo "non-interactive shells that this script can write to."
+        echo "Your non-interactive PATH is: $NONINTERACTIVE_SEARCHPATH"
+        printf "%s" "Continuing..."
+    fi
     if [ -w "$pathDir" ]; then
         # Write a wrapper script for git-annex and git-annex-shell into
         # the path
@@ -197,7 +215,7 @@ for pathDir in $SEARCHPATH; do
                     continue
                 fi
             fi
-            FOUND_DIR=1
+            FOUND_DIR="$pathDir"
             printf "%s" "."
             # Write the wrapper script
             cat << __EOF__ > "$pathDir/$file"
@@ -242,4 +260,10 @@ if [ "$FOUND_DIR" = "0" ]; then
     echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-shell"
     echo "manually"
     exit 1
+elif [ "$NONINTERACTIVE_SEARCHPATH" = "" ]; then
+    echo "Note:"
+    echo "Could not determine the PATH for non-interactive shells."
+    echo "You may want to manually verify that $FOUND_DIR is in"
+    echo "the PATH for non-interactive shells, otherwise git-annex may"
+    echo "not work over ssh."
 fi
