@@ -179,9 +179,11 @@ printf "%s" "."
 # the PATH for that shell. This is used to ensure that the wrapper scripts get
 # put into a directory that is present in the PATH used for non-interactive
 # shells.
-NONINTERACTIVE_SEARCHPATH="$( ssh -o ForwardAgent=no -o ForwardX11=no -o ConnectTimeout=1 -o BatchMode=yes "$(id -un)@127.0.0.1" 'echo "$PATH"' 2>&1 | tail -n1)"
-if [ "$NONINTERACTIVE_SEARCHPATH" != "" ]; then
-    SEARCHPATH="$NONINTERACTIVE_SEARCHPATH:---:$SEARCHPATH"
+if [ "$(id -ru)" != "0" ]; then
+    NONINTERACTIVE_SEARCHPATH="$( ssh -o ForwardAgent=no -o ForwardX11=no -o ConnectTimeout=1 -o BatchMode=yes "$(id -un)@127.0.0.1" 'echo "$PATH"' 2>&1 | tail -n1)"
+    if [ "$NONINTERACTIVE_SEARCHPATH" != "" ]; then
+        SEARCHPATH="$NONINTERACTIVE_SEARCHPATH:---:$SEARCHPATH"
+    fi
 fi
 printf "%s" "."
 # Find a directory in the SEARCHPATH (PATH) that is writeable
@@ -260,7 +262,7 @@ if [ "$FOUND_DIR" = "0" ]; then
     echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-shell"
     echo "manually"
     exit 1
-elif [ "$NONINTERACTIVE_SEARCHPATH" = "" ]; then
+elif [ "$NONINTERACTIVE_SEARCHPATH" = "" ] && [ "$(id -u)" != "0" ]; then
     echo "Note:"
     echo "Could not determine the PATH for non-interactive shells."
     echo "You may want to manually verify that $FOUND_DIR is in"
