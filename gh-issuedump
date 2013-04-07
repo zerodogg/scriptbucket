@@ -1,0 +1,272 @@
+#!/usr/bin/perl
+# gh-issuedump
+# Copyright (C) Eskild Hustvedt 2012
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use 5.010;
+use LWP::UserAgent;
+use JSON qw(encode_json decode_json);
+use MIME::Base64 qw(encode_base64);
+use Getopt::Long;
+use File::Basename;
+# Using true/false is easier to read than 0/1
+use constant { true => 1, false => 0 };
+
+my $VERSION = '0.1';
+my $ua;
+
+main();
+
+# Purpose: Main logic
+# Usage: main()
+sub main
+{
+    my $user;
+    my $org;
+    my $rootURL;
+    my $outputFile;
+
+    # Parse command-line options
+    GetOptions(
+        'u|user=s' => \$user,
+        'o|org|organization=s' => \$org,
+        'f|file=s' => \$outputFile,
+        'help' => sub { Help(); exit(0) },
+        'version' => sub { print 'gh-issuedump version '.$VERSION."\n"; },
+    ) || die ('See '.basename($0).' --help for more information'."\n");
+
+    # We need a username
+    if (!$user)
+    {
+        print 'Usage error: --user is required'."\n";
+        Help();
+        exit(9);
+    }
+    # The file to write the dump to is required
+    if (!$outputFile)
+    {
+        print 'Usage error: --file is required'."\n";
+        Help();
+        exit(8);
+    }
+    # Don't allow overwriting existing files
+    if (-e $outputFile)
+    {
+        print 'Error: '.$outputFile.' already exists. Move it out of the way first'."\n";
+        Help();
+        exit(8);
+    }
+
+    $| = 1;
+
+    $ua = LWP::UserAgent->new(
+        agent => 'gh-issuedump/'.$VERSION.' using libwww-perl/'.$LWP::VERSION,
+    );
+
+    # Set the root URL to fetch
+    if ($org)
+    {
+        $rootURL = '/orgs/'.$org.'/issues?filter=all';
+    }
+    else
+    {
+        $rootURL = '/user/issues?filter=all';
+    }
+
+    # Prompt for a password
+    my $pwd  = prompt('Password for user '.$user.': ');
+
+    # Set accept to the github API version
+    $ua->default_header('Accept' => 'application/vnd.github.beta+json');
+    # Set HTTP basic auth headers
+    $ua->default_header('Authorization' => 'Basic '.encode_base64($user.':'.$pwd));
+
+    # The end result will be stored here
+    my @result;
+
+    # Fetch both open and closed issues
+    foreach my $state (qw(open closed))
+    {
+        # Retrieve the root issue list, resolving pagination
+        my $root = GET_JSON($rootURL.'&state='.$state);
+
+        # Loop through all issues retrieved
+        foreach my $entry (@{ $root })
+        {
+            # If an issue has any comments, replace the comment entry with a dump
+            # of the body of all of the comments
+            if ($entry->{comments} > 0)
+            {
+                $entry->{comments} = GET_JSON('/repos/'.$entry->{repository}->{owner}->{login}.'/'.$entry->{repository}->{name}.'/issues/'.$entry->{number}.'/comments');
+            }
+            push(@result,$entry);
+        }
+    }
+
+    # Write the final file
+    print 'Writing '.$outputFile.' ...';
+    open(my $out,'>',$outputFile);
+    print {$out} encode_json(\@result);
+    close($out);
+    print "done\n";
+}
+
+# Purpose: Retrieve a JSON object from github
+# Usage: $object = GET_JSON(URL);
+# 
+# This method makes sure to follow any 'rel=next' pagination headers
+# as well before returning.
+sub GET_JSON
+{
+    my $URL = shift;
+    if ($URL !~ m{^https?://})
+    {
+        $URL = 'https://api.github.com'.$URL;
+    }
+    print 'Fetching '.$URL.' ...';
+    my $response = $ua->get($URL);
+    if ($response->is_success)
+    {
+        my $JSON = decode_json($response->decoded_content);
+        print "done\n";
+        # Resolve 'rel="next"' pagination link headers
+        if(ref($JSON) eq 'ARRAY')
+        {
+            if (my $link = $response->header('Link'))
+            {
+                my @links = split(/,/,$link);
+                foreach $link (@links)
+                {
+                    if ($link =~ s/\s*rel="next"$//)
+                    {
+                        $link =~ s/^.*<([^>]+)>.*$/$1/;
+                        my $ret = GET_JSON($link);
+                        if(ref($ret) eq 'ARRAY')
+                        {
+                            push(@{$JSON},@{$ret});
+                        }
+                    }
+                }
+            }
+        }
+        # Return the final value
+        return $JSON;
+    }
+    else
+    {
+        print "failed\n";
+        if ($response->code == 401)
+        {
+            die('Invalid username or password'."\n");
+        }
+        die($response->status_line);
+    }
+}
+
+# Purpose: Prompt the user for input
+# Usage: $input = prompt('PROMPT');
+sub prompt
+{
+    my $p = shift;
+    while(1)
+    {
+        print $p;
+
+        my $input = <STDIN>;
+        if(defined $input)
+        {
+            chomp($input);
+            if ($input =~ /\S/)
+            {
+                return $input;
+            }
+        }
+    }
+}
+
+# Purpose: Print formatted --help output
+# Usage: PrintHelp('-shortoption', '--longoption', 'description');
+#  Description will be reformatted to fit within a normal terminal
+sub PrintHelp
+{
+	# The short option
+	my $short = shift,
+	# The long option
+	my $long = shift;
+	# The description
+	my $desc = shift;
+	# The generated description that will be printed in the end
+	my $GeneratedDesc;
+	# The current line of the description
+	my $currdesc = '';
+	# The maximum length any line can be
+	my $maxlen = 80;
+	# The length the options take up
+	my $optionlen = 20;
+	# Check if the short/long are LONGER than optionlen, if so, we need
+	# to do some additional magic to take up only $maxlen.
+	# The +1 here is because we always add a space between them, no matter what
+	if ((length($short) + length($long) + 1) > $optionlen)
+	{
+		$optionlen = length($short) + length($long) + 1;
+	}
+	# Split the description into lines
+	foreach my $part (split(/ /,$desc))
+	{
+		if(defined $GeneratedDesc)
+		{
+			if ((length($currdesc) + length($part) + 1 + 20) > $maxlen)
+			{
+				$GeneratedDesc .= "\n";
+				$currdesc = '';
+			}
+			else
+			{
+				$currdesc .= ' ';
+				$GeneratedDesc .= ' ';
+			}
+		}
+		$currdesc .= $part;
+		$GeneratedDesc .= $part;
+	}
+	# Something went wrong
+	die('Option mismatch') if not $GeneratedDesc;
+	# Print it all
+	foreach my $description (split(/\n/,$GeneratedDesc))
+	{
+		printf "%-4s %-15s %s\n", $short,$long,$description;
+		# Set short and long to '' to ensure we don't print the options twice
+		$short = '';$long = '';
+	}
+	# Succeed
+	return true;
+}
+
+# Purpose: Output the program --help info.
+# Usage: Help();
+sub Help
+{
+    print 'gh-issuedump - retrieves a dump of all open and closed issues from'."\n";
+    print '               the github issue tracker'."\n";
+	printf("\nUsage: %s [OPTIONS]\n", basename($0));
+	PrintHelp('', '--version', 'Display version information and exit');
+	PrintHelp('-h', '--help', 'This help screen');
+    PrintHelp('-u','--user N','The user to authenticate as');
+    PrintHelp('-o','--org N','The organization to get issue dumps from. If this is not specified then issues for the authenticated user will be fetched instead');
+    PrintHelp('-f','--file N','Write the dump to this file');
+    print "\n--user and --file are both required\n";
+}

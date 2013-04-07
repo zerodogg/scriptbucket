@@ -43,6 +43,9 @@ COPYING for the full license text.
     
     getdagsrevyen       A script to fetch the latest dagsrevyen (Norwegian NRK TV news)
                         video podcast and play it.
+
+    gh-issuedump        A script that downloads a dump of all issues on a
+                        GitHub issue tracker for a user or organization.
     
     gitannex-install    A script that downloads and installs (or updates) the
                         git-annex standalone builds.
