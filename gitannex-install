@@ -152,16 +152,22 @@ if [ "$ret" != "0" ]; then
     echo "Download failed, exiting"
     exit 1
 fi
-# Recreate the installation target directory
-rm -rf "$INSTALLDIR"
-mkdir -p "$INSTALLDIR"
-cd "$INSTALLDIR"
 # Install git-annex
 if [ "$MODE" = "install" ]; then
     printf "%s" "Installing..."
 else
     printf "%s" "Upgrading..."
 fi
+# Recreate the installation target directory
+if [ -x "$INSTALLDIR/uninstall" ]; then
+    "$INSTALLDIR/uninstall" >/dev/null 2>&1
+fi
+if [ -e "$INSTALLDIR" ]; then
+    rmdir "$INSTALLDIR" || exit 1
+fi
+mkdir -p "$INSTALLDIR"
+cd "$INSTALLDIR"
+printf "%s" "."
 # Extract it
 tar -zxf "$TEMPFILE"
 printf "%s" "."
