@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-# latexb2
-# Copyright (C) Eskild Hustvedt 2006
+# latexb - a LaTeX build tool
+# Copyright (C) Eskild Hustvedt 2006, 2013
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,83 +16,166 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
-use Getopt::Long;
 use strict;
 use warnings;
+use Getopt::Long;
+use File::Basename qw(basename);
 
-my $Version = '0.1';
+my $Version = 0.2;
 
 my ($PDF, $RUNXAPP, $RUNBIB);
 
-my $OutType;
-my $Latex;
-my $Bibtex = 'bibtex';
-Getopt::Long::Configure ("bundling", 'prefix_pattern=(--|-)');
+Getopt::Long::Configure ('bundling', 'prefix_pattern=(--|-)');
 
 # Purpose: Print formatted --help output
-# Usage: PrintHelp("-shortoption", "--longoption", "description");
-sub PrintHelp ($$$) {
-	printf "%-4s %-16s %s\n", "$_[0]", "$_[1]", "$_[2]";
+# Usage: PrintHelp('-shortoption', '--longoption', 'description');
+#  Description will be reformatted to fit within a normal terminal
+sub PrintHelp
+{
+	# The short option
+	my $short = shift,
+	# The long option
+	my $long = shift;
+	# The description
+	my $desc = shift;
+	# The generated description that will be printed in the end
+	my $GeneratedDesc;
+	# The current line of the description
+	my $currdesc = '';
+	# The maximum length any line can be
+	my $maxlen = 80;
+	# The length the options take up
+	my $optionlen = 20;
+	# Check if the short/long are LONGER than optionlen, if so, we need
+	# to do some additional magic to take up only $maxlen.
+	# The +1 here is because we always add a space between them, no matter what
+	if ((length($short) + length($long) + 1) > $optionlen)
+	{
+		$optionlen = length($short) + length($long) + 1;
+	}
+	# Split the description into lines
+	foreach my $part (split(/ /,$desc))
+	{
+		if(defined $GeneratedDesc)
+		{
+			if ((length($currdesc) + length($part) + 1 + 20) > $maxlen)
+			{
+				$GeneratedDesc .= "\n";
+				$currdesc = '';
+			}
+			else
+			{
+				$currdesc .= ' ';
+				$GeneratedDesc .= ' ';
+			}
+		}
+		$currdesc .= $part;
+		$GeneratedDesc .= $part;
+	}
+	# Something went wrong
+	die('Option mismatch') if not $GeneratedDesc;
+	# Print it all
+	foreach my $description (split(/\n/,$GeneratedDesc))
+	{
+		printf "%-4s %-15s %s\n", $short,$long,$description;
+		# Set short and long to '' to ensure we don't print the options twice
+		$short = '';$long = '';
+	}
+	# Succeed
+	return 1;
 }
 
-sub MainBuild {
-	my $FILE = shift;
-	my $AUXFILE;
-	unless(defined($FILE) and length($FILE)) {
-		die("I need at least one commandline option: The LaTeX source file.\n")
-	}
+# Purpose: Build a file
+# Usage: buildFile(FILE);
+sub buildFile
+{
+    my $file = shift;
 
-	unless(-e $FILE) {
-		if (-e "$FILE.tex") {
-			$FILE = "$FILE.tex";
-		} elsif (-e "${FILE}tex") {
-			$FILE = "${FILE}tex";
-		} else {
-			die("$FILE: Does not exist\n");
+    if (!-e $file)
+    {
+        if ( -e $file.'.tex')
+        {
+            $file = $file.'.tex';
+        }
+        elsif(-e $file.'tex')
+        {
+            $file = $file.'tex';
+        }
+        else
+        {
+            die($file.': does not exist'."\n");
+        }
+    }
+    my $basefile = basename($file);
+
+    my @command;
+    if(InPath('xelatex'))
+    {
+        if ($PDF)
+        {
+            @command = qw(xelatex);
+        }
+        else
+        {
+            @command = qw(xelatex -no-pdf);
+        }
+    }
+    else
+    {
+        if ($PDF)
+        {
+            if (!InPath('pdflatex'))
+            {
+                die('Missing either of pdflatex or xelatex'."\n");
+            }
+            @command = qw(pdflatex);
+        }
+        else
+        {
+            if (!InPath('latex'))
+            {
+                die('Missing either of pdflatex or xelatex'."\n");
+            }
+            @command = qw(latex);
+        }
+    }
+    system(@command,$file);
+
+	foreach(qw(bbl blg bib aux))
+    {
+		if (-e $basefile.'.'.$_)
+        {
+            $RUNBIB = 1;
+            last;
+        }
+    }
+
+    if ($RUNBIB)
+    {
+        system('bibtex',$basefile.'.aux');
+    }
+
+    system(@command,$file);
+    system(@command,$file);
+
+	if($RUNXAPP)
+    {
+        my @runcommand;
+		if($PDF)
+        {
+			$file =~ s/tex$/pdf/;
+            @runcommand = qw(evince);
 		}
-	}
-
-	if($PDF) {
-		$Latex = 'pdflatex';
-	} else {
-		$Latex = 'latex';
-	}
-
-	if(not InPath($Latex))
-	{
-		die($Latex.': is missing. Please install it and then re-run latexb'."\n");
-	}
-
-	# Set AUXFILE
-	$AUXFILE = $FILE;
-	$AUXFILE =~ s/tex$/aux/;
-
-	my $Basename = $FILE;
-	$Basename =~ s/\.tex$//;
-
-	# Run LaTeX three times and bibtex once if $RUNBIB is true
-	system("$Latex $FILE");
-	foreach(qw(bbl blg bib aux)) {
-		if (-e "$Basename.$_") {
-			$RUNBIB = 1;
-			last;
+        else
+        {
+			$file =~ s/tex$/dvi/;
+            @runcommand = qw(xdvi -thorough);
 		}
-	}
-	system("$Bibtex $AUXFILE") if $RUNBIB;
-	system("$Latex $FILE");
-	system("$Latex $FILE");
-
-	if(defined($RUNXAPP)) {
-		my $XFILE = $FILE;
-		if($PDF) {
-			$XFILE =~ s/tex$/pdf/;
-			die "$XFILE doesn't exist, unable to start evince\n" unless -e $XFILE;
-			system("evince $XFILE");
-		} else {
-			$XFILE =~ s/tex$/dvi/;
-			die "$XFILE doesn't exist, unable to start xdvi\n" unless -e $XFILE;
-			system("xdvi -thorough $XFILE");
-		}
+        if (!-e $file)
+        {
+            die($file.': does not exist, unable to display document'."\n");
+        }
+        system(@runcommand,$file);
 	}
 }
 
@@ -109,15 +192,15 @@ GetOptions (
 	'b|bib' => \$RUNBIB,
 	'x|xdvi' => \$RUNXAPP,
 	'e|evince' => \$RUNXAPP,
-	'h|help' => sub {
+	'h|help' => sub
+    {
 		print "latexb - LaTeX builder $Version\n\n";
 		print "Usage: $0 [OPTIONS] filename.tex\n\n";
-		PrintHelp("-b", "--bib", "Run through bibtex. Only needed once, latexb will autodetect");
-		PrintHelp("", "", "it afterwards");
-		PrintHelp("-p", "--pdf", "Use pdflatex instead of latex");
-		PrintHelp("-x", "--xdvi", "Run xdvi on the resulting *.dvi");
-		PrintHelp("-e", "--evince", "Run evince on the resulting *.pdf");
-		PrintHelp("-h", "--help", "Display this help screen");
+		PrintHelp('-b', '--bib', 'Run through bibtex. Only needed once, latexb will autodetect it afterwards');
+		PrintHelp('-p', '--pdf', 'Use pdflatex instead of latex');
+		PrintHelp('-x', '--xdvi', 'Run xdvi on the resulting *.dvi');
+		PrintHelp('-e', '--evince', 'Run evince on the resulting *.pdf');
+		PrintHelp('-h', '--help', 'Display this help screen');
 		print "\nIf --evince is supplied when building a dvi it acts as an alias for -x\n";
 		print "If --xdvi is supplied when building a pdf it acts as an alias for -e\n";
 		exit(0);
@@ -126,6 +209,7 @@ GetOptions (
 
 die("Requires one option: the file to build\n") if not @ARGV;
 
-foreach my $CurrentFile (@ARGV) {
-	MainBuild($CurrentFile);
+foreach my $CurrentFile (@ARGV)
+{
+	buildFile($CurrentFile);
 }
