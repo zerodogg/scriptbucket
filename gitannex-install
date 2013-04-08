@@ -229,7 +229,7 @@ for pathDir in $SEARCHPATH; do
             cat << __EOF__ > "$pathDir/$file"
 #!/bin/sh
 # Installed by gitannex-install
-exec "$INSTALLDIR/$file" "\$@"
+exec "$INSTALLDIR/runshell" "$file" "\$@"
 __EOF__
             chmod 755 "$pathDir/$file"
             # Link the wrapper script into the install directory, so that the uninstall
