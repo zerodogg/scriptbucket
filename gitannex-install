@@ -262,7 +262,7 @@ printf "%s" "."
 printf "%s" "."
 [ -e "$INSTALLDIR/.git-annex-shell-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-shell-wrapper"\`"
 printf "%s" "."
-rm -rf "$INSTALLDIR"
+[ -e "$INSTALLDIR/runshell" ] && rm -rf "$INSTALLDIR"
 printf "%s" "."
 echo "done"
 __EOF__
