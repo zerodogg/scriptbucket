@@ -381,7 +381,29 @@ sub installPlugin_git
 	my $info = shift;
 	chdir($bundleDir);
 	rmDirTree('./'.$plugin);
-	system('git','clone','--depth',1,'-q',$info->{url},'./'.$plugin) and die("git failed to clone the repository.\n");
+    my $cloned = 0;
+    my $attempts;
+    while(!$cloned)
+    {
+        $attempts++;
+        if (system('git','clone','--depth',1,'-q',$info->{url},'./'.$plugin) == 0)
+        {
+            $cloned = 1;
+        }
+        elsif($attempts > 4)
+        {
+            die("git failed to clone the repository.\n");
+        }
+        else
+        {
+            my $o = $|;
+            $| = 1;
+            print 'git clone failed, will retry in '.$attempts.' second(s)...';
+            sleep($attempts);
+            print 'retrying'."\n";
+            $| = $o;
+        }
+    }
     print "Made a shallow clone of ".$info->{url}."\n";
 }
 
