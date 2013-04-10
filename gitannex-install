@@ -196,9 +196,10 @@ printf "%s" "."
 # put into a directory that is present in the PATH used for non-interactive
 # shells.
 if [ "$(id -ru)" != "0" ]; then
-    NONINTERACTIVE_SEARCHPATH="$( ssh -o ForwardAgent=no -o ForwardX11=no -o ConnectTimeout=1 -o BatchMode=yes "$(id -un)@127.0.0.1" 'echo "$PATH"' 2>&1 | tail -n1)"
-    if [ "$NONINTERACTIVE_SEARCHPATH" != "" ]; then
-        SEARCHPATH="$NONINTERACTIVE_SEARCHPATH:---:$SEARCHPATH"
+    NONINTERACTIVE_SEARCHPATH="$( LC_ALL=C ssh -o ForwardAgent=no -o ForwardX11=no -o ConnectTimeout=1 -o BatchMode=yes "$(id -un)@127.0.0.1" 'echo "$PATH"' 2>&1)"
+    RET="$?"
+    if [ "$NONINTERACTIVE_SEARCHPATH" != "" ] &&  ! echo "$NONINTERACTIVE_SEARCHPATH" |grep -q 'Permission denied' && echo "$NONINTERACTIVE_SEARCHPATH" |grep -q ':' && [ "$RET" = "0" ]; then
+        SEARCHPATH="$(echo "$NONINTERACTIVE_SEARCHPATH"|tail -n1):---:$SEARCHPATH"
     fi
 fi
 printf "%s" "."
