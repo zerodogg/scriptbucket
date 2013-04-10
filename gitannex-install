@@ -38,6 +38,10 @@ if [ "$(id -ru)" = "0" ]; then
 fi
 # Store the version number in this file
 VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
+# Store the gitannex-install version in this file
+META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
+# gitannex-install meta version
+METAVERSION=1
 # The mode we're running in
 MODE="upgrade"
 # The URL to download from (will be different for --daily)
@@ -118,6 +122,8 @@ else
 fi
 # Read the currently installed version, if any
 CURRENT_VERSION="$( catFile "$VERSIONFILE" )"
+# Read the currently installed meta version, if any
+CURRENT_METAVERSION="$( catFile "$META_VERSIONFILE" )"
 # If we failed to get any version number, exit
 if [ "$VERSION" = "" ]; then
     echo "failed"
@@ -127,11 +133,14 @@ else
 fi
 # If the version matches the installed one, then just exit now (unless the user
 # wants to --force us to continue)
-if [ "$VERSION" = "$CURRENT_VERSION" ] && [ "$FORCE" = "0" ]; then
+if [ "$VERSION" = "$CURRENT_VERSION" ] && [ "$FORCE" = "0" ] && [ "$CURRENT_METAVERSION" = "$METAVERSION" ]; then
     echo "git-annex is up to date"
     exit 0
 elif [ "$CURRENT_VERSION" = "" ]; then
     MODE="install"
+fi
+if [ "$VERSION" = "$CURRENT_VERSION" ] && [ "$CURRENT_METAVERSION" != "$METAVERSION" ]; then
+    echo "Forcing update due to changes in gitannex-install"
 fi
 if [ "$CHECK" = "1" ]; then
     if [ "$MODE" = "install" ]; then
@@ -180,6 +189,7 @@ rmdir git-annex.linux
 rm -f "$TEMPFILE"
 # Write the version number
 echo "$VERSION" > "$VERSIONFILE"
+echo "$METAVERSION" > "$META_VERSIONFILE"
 printf "%s" "."
 # This ssh's to localhost as the current user, if possible, and then retrieves the
 # the PATH for that shell. This is used to ensure that the wrapper scripts get
