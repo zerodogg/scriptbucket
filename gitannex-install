@@ -161,6 +161,11 @@ if [ "$ret" != "0" ]; then
     echo "Download failed, exiting"
     exit 1
 fi
+if [ -L "$INSTALLDIR" ] && [ "$INSTALLDIR" != "/usr/local/git-annex" ]; then
+    INSTALLDIR_L="$(readlink "$INSTALLDIR")"
+    echo "Note: $INSTALLDIR is a symlink, operating on its target: $INSTALLDIR_L"
+    INSTALLDIR="$INSTALLDIR_L"
+fi
 # Install git-annex
 if [ "$MODE" = "install" ]; then
     printf "%s" "Installing..."
