@@ -76,18 +76,11 @@ my %plugins = (
 			}
 		]
 	},
-	'javascript-syntax' => {
-		type     => 'raw',
-		vimOrgId => 10728,
-		target   => 'syntax/javascript.vim',
-	},
-	'javascript-indent' => {
-		type   => 'raw',
-		# This is only available on the vim wiki (http://vim.wikia.com/wiki/Improved_Javascript_Indent_script_for_Vim)
-		# so I have mirrored the script file itself so that it can be installed by prepVim
-		url    => 'http://zarb.org/~zerodogg/mirrored/javascript.vim',
-		target => 'indent/javascript.vim',
-	},
+    'javascript' => 
+    {
+        type => 'git',
+        url => 'git://github.com/pangloss/vim-javascript.git'
+    },
 	'align' => {
 		type     => 'vimball',
 		vimOrgId => 10110,
