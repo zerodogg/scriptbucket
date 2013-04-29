@@ -109,6 +109,7 @@ my %plugins = (
 	'supertab' => {
 		type => 'git',
 		url => 'http://github.com/ervandew/supertab.git',
+        checkout => 'a2268b61edc4ba38d152ecfa7c853a7f1bc71370',
 	},
 	'MRU' => {
 		type => 'raw',
@@ -386,9 +387,23 @@ sub installPlugin_git
     while(!$cloned)
     {
         $attempts++;
-        if (system('git','clone','--depth',1,'-q',$info->{url},'./'.$plugin) == 0)
+        my @command = (qw(git clone),$info->{url},'./'.$plugin);
+        if (!$info->{checkout})
+        {
+            push(@command,qw(--depth 1 -q));
+        }
+        if ($info->{branch})
+        {
+            push(@command,'--branch',$info->{branch});
+        }
+        if (system(@command) == 0)
         {
             $cloned = 1;
+            if ($info->{checkout})
+            {
+                chdir($plugin);
+                system(qw(git checkout -b use),$info->{checkout});
+            }
         }
         elsif($attempts > 4)
         {
@@ -404,7 +419,14 @@ sub installPlugin_git
             $| = $o;
         }
     }
-    print "Made a shallow clone of ".$info->{url}."\n";
+    if ($info->{checkout})
+    {
+        print "Made a clone of ".$info->{url}."\n";
+    }
+    else
+    {
+        print "Made a shallow clone of ".$info->{url}."\n";
+    }
 }
 
 # Purpose: Install a 'raw' plugin (ie. not archived or git)
