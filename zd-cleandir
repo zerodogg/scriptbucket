@@ -33,7 +33,10 @@ for file in `find -maxdepth 1 $extraarg`; do
 			continue
 		fi
 	fi
-	DATE="`ls $LSADD -l --time-style=long-iso "$file" | perl -pi -e 's#^\S+\s*\d+\s+\S+\s+\S+\s+\S+\s+##; s#\s*\d+:.*$##; s#-\d+$##;s#-#/#g;'`"
+    if [ ! -e "$file" ]; then
+        continue
+    fi
+	DATE="`ls $LSADD -Ll --time-style=long-iso "$file" | perl -pi -e 's#^\S+\s*\d+\s+\S+\s+\S+\s+\S+\s+##; s#\s*\d+:.*$##; s#-\d+$##;s#-#/#g;'`"
 	# Alternate syntax
 #	DATE="`ls $LSADD -l --time-style=long-iso "$file" | perl -pi -e 's#^\S+\s*\d+\s+\S+\s+\S+\s+\S+\s+##; s#\s*\d+:.*$##;'`"
 	mkdir -v -p "$DATE"
