@@ -114,8 +114,9 @@ my %plugins = (
 		vimOrgId => 13783,
 	},
 	'vimoutliner' => {
-		url => 'https://github.com/downloads/vimoutliner/vimoutliner/vimoutliner-0.3.6.tgz',
-		type => 'tar.gz'
+        type => 'git',
+        url => 'git://github.com/vimoutliner/vimoutliner.git',
+        branch => 'development', # Known good: 038a028a00
 	},
     solarized => {
         url => 'git://github.com/altercation/vim-colors-solarized.git',
