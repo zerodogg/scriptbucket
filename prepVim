@@ -87,11 +87,11 @@ my %plugins = (
 	},
 	'vim-git' => {
 		type => 'git',
-		url => 'https://github.com/tpope/vim-git.git'
+		url => 'git://github.com/tpope/vim-git.git'
 	},
 	'snipmate' => {
 		type => 'git',
-		url => 'https://github.com/msanders/snipmate.vim.git',
+		url => 'git://github.com/msanders/snipmate.vim.git',
 		postRun => sub
 		{
 			# I don't like some of the default snippets, so fetch alternate ones
@@ -118,7 +118,7 @@ my %plugins = (
 		type => 'tar.gz'
 	},
     solarized => {
-        url => 'https://github.com/altercation/vim-colors-solarized.git',
+        url => 'git://github.com/altercation/vim-colors-solarized.git',
         type => 'git',
     },
     'sass-syntax' =>
@@ -178,9 +178,9 @@ my %plugins = (
     },
     'nerdtree' => {
         type => 'git',
-        url => 'https://github.com/scrooloose/nerdtree.git',
+        url => 'git://github.com/scrooloose/nerdtree.git',
     },
-
+    },
 );
 
 # We need $HOME
