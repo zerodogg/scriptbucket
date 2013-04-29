@@ -156,6 +156,11 @@ my %plugins = (
             out('filetype.vim',"au BufNewFile,BufRead *.sass setf sass\n au BufNewFile,BufRead *.scss setf scss\n");
         }
     },
+    'less-syntax' =>
+    {
+        type => 'git',
+        url => 'git://github.com/groenewege/vim-less.git',
+    },
     'gtk-vim-syntax' => {
         type => 'tar.gz',
         vimOrgId => 15217,
@@ -181,6 +186,17 @@ my %plugins = (
         type => 'git',
         url => 'git://github.com/scrooloose/nerdtree.git',
     },
+    'handlebars' => {
+        type => 'git',
+        url => 'git://github.com/nono/vim-handlebars',
+    },
+    'syntastic' => {
+        type => 'git',
+        url => 'git://github.com/scrooloose/syntastic.git',
+    },
+    'buffergator' => {
+        type => 'git',
+        url => 'git://github.com/jeetsukumaran/vim-buffergator.git',
     },
 );
 
