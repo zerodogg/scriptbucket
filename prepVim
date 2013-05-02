@@ -31,7 +31,8 @@ use Fatal qw(chdir mkpath);
 my %plugins = (
 	'perl-syntax' => {
 		type     => 'git',
-		url      => 'https://github.com/rkitover/perl-vim-mxd.git',
+		url      => 'http://github.com/zerodogg/vim-perl.git',
+        branch   => 'method-signatures-support',
 	},
 	'indentAnything' => {
 		type     => 'tar.gz',
