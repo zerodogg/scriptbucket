@@ -151,9 +151,7 @@ if [ "$CHECK" = "1" ]; then
     exit 0
 fi
 # Temporary file to save the tarball to
-TEMPFILE="$(mktemp -t git-annex-standalone-package.XXXXXXXXXXX)"
-mv $TEMPFILE "${TEMPFILE}.tar.gz"
-TEMPFILE="${TEMPFILE}.tar.gz"
+TEMPFILE="$(mktemp -t git-annex-standalone-package.tar.gz-XXXXXXXXXXX)"
 # Download the tarball
 echo "Downloading git-annex $VERSION:"
 wget -O "$TEMPFILE" "$GET_URL"
