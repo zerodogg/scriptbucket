@@ -30,6 +30,8 @@ catFile ()
 SEARCHPATH="$PATH"
 # The target installation directory
 INSTALLDIR="$HOME/.local/share/git-annex"
+# The target for the .desktop file
+DESKTOPDIR="$HOME/.local/share/applications"
 # Install globally to /usr/local if running as root
 if [ "$(id -ru)" = "0" ]; then
     INSTALLDIR="/usr/local/git-annex"
@@ -41,7 +43,7 @@ VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
 # Store the gitannex-install version in this file
 META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
 # gitannex-install meta version
-METAVERSION=1
+METAVERSION=2
 # The mode we're running in
 MODE="upgrade"
 # The URL to download from (will be different for --daily)
@@ -256,6 +258,25 @@ __EOF__
     fi
 done
 printf "%s" "."
+# Create a desktop-file
+if [ -e "$INSTALLDIR/logo.svg" ]; then
+    mkdir -p "$DESKTOPDIR"
+    cat << __EOF__ > "$DESKTOPDIR/git-annex-gitannexinstall.desktop"
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Name=git-annex
+TryExec=$INSTALLDIR/runshell
+Exec="$INSTALLDIR/runshell" git-annex webapp
+Categories=Utility
+Icon=$INSTALLDIR/logo.svg
+Terminal=false
+Type=Application
+StartupNotify=false
+__EOF__
+    chmod +x "$DESKTOPDIR/git-annex-gitannexinstall.desktop"
+    printf "%s" "."
+fi
 # Write the uninstall script
 cat << __EOF__ > "$INSTALLDIR/uninstall"
 #!/bin/sh
@@ -268,6 +289,8 @@ printf "%s" "."
 [ -e "$INSTALLDIR/.git-annex-shell-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-shell-wrapper"\`"
 printf "%s" "."
 [ -e "$INSTALLDIR/runshell" ] && rm -rf "$INSTALLDIR"
+printf "%s" "."
+[ -e "$DESKTOPDIR/git-annex-gitannexinstall.desktop" ] && rm -f ""$DESKTOPDIR/git-annex-gitannexinstall.desktop"
 printf "%s" "."
 echo "done"
 __EOF__
