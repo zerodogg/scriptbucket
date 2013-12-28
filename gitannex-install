@@ -46,9 +46,12 @@ META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
 METAVERSION=2
 # The mode we're running in
 MODE="upgrade"
+UNAME_M="$(uname -m)"
 # The URL to download from (will be different for --daily)
-if [ "$(uname -m)" = "x86_64" ]; then
+if [ "$UNAME_M" = "x86_64" ]; then
     GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz"
+elif [ "$UNAME_M" = "armel" ] || [ "$UNAME_M" = "armv6l" ]; then
+    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-armel.tar.gz"
 else
     GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz"
 fi
