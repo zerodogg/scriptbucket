@@ -325,10 +325,9 @@ else
     echo "git-annex has been upgraded from $CURRENT_VERSION to $VERSION"
 fi
 if [ "$FOUND_DIR" = "0" ]; then
-    echo "Warning: failed to write wrapper scripts in your PATH"
-    echo "git-annex most likely won't work, you will need to create wrappers for"
-    echo "$INSTALLDIR/git-annex and $INSTALLDIR/git-annex-shell"
-    echo "manually"
+    echo "Warning: could not find a writable directory in your PATH to put"
+    echo "the wrapper scripts in. git-annex will most likely not work."
+    echo "Ensure that there is a writable directory in your PATH and try again."
     exit 1
 elif [ "$NONINTERACTIVE_SEARCHPATH" = "" ] && [ "$(id -u)" != "0" ]; then
     echo "Note:"
