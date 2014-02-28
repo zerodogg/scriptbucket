@@ -19,6 +19,14 @@ use warnings;
 use JSON qw(decode_json);
 use utf8;
 
+sub escape
+{
+    my $s = shift;
+    $s =~ s/</&lt;/g;
+    $s =~ s/>/&gt;/g;
+    return $s;
+}
+
 $| = 1;
 
 my $usage = 'USAGE: '.$0.' infile.json outfile.html'."\n";
@@ -79,13 +87,13 @@ print {$out} "\n";
 foreach my $ent (@{$json})
 {
     print {$out} '<div class="bookmark'.($ent->{toread} eq 'yes' ? ' toread' : '').($ent->{shared} eq 'no' ? ' private' : '').'">';
-    print {$out} '<a href="'.$ent->{href}.'">'.$ent->{description}.'</a>';
+    print {$out} '<a href="'.$ent->{href}.'">'.escape($ent->{description}).'</a>';
     if ($ent->{extended})
     {
-        print {$out} '<div class="info">'.$ent->{extended}.'</div>';
+        print {$out} '<div class="info">'.escape($ent->{extended}).'</div>';
     }
-    print {$out} '<div class="tags">'.$ent->{tags}.'</div>';
-    print {$out} '<div class="meta">'.$ent->{time}.'</div>';
+    print {$out} '<div class="tags">'.escape($ent->{tags}).'</div>';
+    print {$out} '<div class="meta">'.escape($ent->{time}).'</div>';
     print {$out} '</div>';
     print {$out} "\n";
 }
