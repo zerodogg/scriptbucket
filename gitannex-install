@@ -149,7 +149,7 @@ else
     # Trust the _GA version number if it matches $VERSION
     # This avoids gitannex-install attempting to upgrade git-annex to a version
     # that it has already auto-upgraded to.
-    if [ "$VERSION" == "$CURRENT_VERSION_GA" ]; then
+    if [ "$VERSION" = "$CURRENT_VERSION_GA" ]; then
         CURRENT_VERSION="$CURRENT_VERSION_GA"
     fi
     echo "done - $VERSION (installed version: $CURRENT_VERSION)"
