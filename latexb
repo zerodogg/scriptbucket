@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 # latexb - a LaTeX build tool
-# Copyright (C) Eskild Hustvedt 2006, 2013
+# Copyright (C) Eskild Hustvedt 2006, 2013, 2014
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -20,10 +20,16 @@ use strict;
 use warnings;
 use Getopt::Long;
 use File::Basename qw(basename);
+use Time::HiRes qw(sleep);
+use Try::Tiny;
 
 my $Version = 0.2;
 
-my ($PDF, $RUNXAPP, $RUNBIB);
+my ($RunViewer, $RunBibtex, $RunBiber);
+my $PDF = 1;
+my $verbosity = 0;
+my $clean = 1;
+my $watcher = 0;
 
 Getopt::Long::Configure ('bundling', 'prefix_pattern=(--|-)');
 
@@ -85,9 +91,9 @@ sub PrintHelp
 	return 1;
 }
 
-# Purpose: Build a file
-# Usage: buildFile(FILE);
-sub buildFile
+# Purpose: Resolve the path to a tex file
+# Usage: resovled = resolvePath(path);
+sub resolvePath
 {
     my $file = shift;
 
@@ -105,8 +111,22 @@ sub buildFile
         {
             die($file.': does not exist'."\n");
         }
+        printv('Autodetected '.$file."\n");
     }
-    my $basefile = basename($file);
+    return $file;
+}
+
+# Purpose: Build a file
+# Usage: buildFile(FILE);
+sub buildFile
+{
+    my $file = shift;
+    $file = resolvePath($file);
+
+    my $rootFilePath = $file;
+    $rootFilePath    =~ s/\.[^\.]+$//;
+
+    cleanup($rootFilePath);
 
     my @command;
     if(InPath('xelatex'))
@@ -139,26 +159,61 @@ sub buildFile
             @command = qw(latex);
         }
     }
-    system(@command,$file);
+    requiredSystem(@command,$file);
 
-	foreach(qw(bbl blg bib aux))
+    if (!$RunBibtex && !$RunBiber)
     {
-		if (-e $basefile.'.'.$_)
+        # FIXME: Should just open the file internally
+        if(InPath('biber') && wsystem(qw(grep -q),'{biblatex}',$file) == 0)
         {
-            $RUNBIB = 1;
-            last;
+            printv('Enabled biber due to one instance of "{biblatex}" in file'."\n");
+            $RunBiber = 1;
+        }
+        if (!$RunBiber)
+        {
+            foreach(qw(bbl blg bib))
+            {
+                if (-e $rootFilePath.'.'.$_)
+                {
+                    printv('Enabled bibtex due to existance of '.$rootFilePath.'.'.$_."\n");
+                    $RunBibtex = 1;
+                    last;
+                }
+            }
+            if (!$RunBibtex)
+            {
+                # FIXME: Should just open the file internally
+                if(wsystem(qw(grep -q),'bibliography{',$file) == 0)
+                {
+                    printv('Enabled bibtex due to one instance of "bibliography{" in file'."\n");
+                    $RunBibtex = 1;
+                }
+            }
         }
     }
 
-    if ($RUNBIB)
+    if ($RunBibtex)
     {
-        system('bibtex',$basefile.'.aux');
+        foreach my $type (qw(bibtexu bibtex8 bibtex))
+        {
+            if(InPath($type))
+            {
+                requiredSystem($type,$rootFilePath);
+                last;
+            }
+        }
+    }
+    elsif($RunBiber)
+    {
+        requiredSystem('biber',$rootFilePath);
     }
 
-    system(@command,$file);
-    system(@command,$file);
+    requiredSystem(@command,$file);
+    requiredSystem(@command,$file);
 
-	if($RUNXAPP)
+    cleanup($rootFilePath);
+
+	if($RunViewer)
     {
         my @runcommand;
 		if($PDF)
@@ -175,7 +230,7 @@ sub buildFile
         {
             die($file.': does not exist, unable to display document'."\n");
         }
-        system(@runcommand,$file);
+        wsystem(@runcommand,$file);
 	}
 }
 
@@ -186,30 +241,116 @@ sub InPath
 	foreach (split /:/, $ENV{PATH}) { if (-x "$_/@_" and ! -d "$_/@_" ) {	return "$_/@_"; } } return 0;
 }
 
+# Purpose: system() wrapper
+# Usage: Same as system
+sub wsystem
+{
+    printv('Running: '.join(' ',@_)."\n");
+    return system(@_);
+}
+
+# Purpose: system() wrapper that dies if the commands exits with nonzero
+# Usage: Same as wsystem
+sub requiredSystem
+{
+    if(wsystem(@_) != 0)
+    {
+        die('The command "'.join(' ',@_).'" exited with nonzero, bailing out.'."\n");
+    }
+}
+
+# Purpose: print a message in verbose mode
+# Usage: same as warn() (NOT print())
+sub printv
+{
+    if ($verbosity > 0)
+    {
+        warn(@_);
+    }
+}
+
+# Purpose: Perform cleanup
+# Usage: cleanup(baseFile);
+sub cleanup
+{
+    my $rootFilePath = shift;
+    if ($clean)
+    {
+        foreach my $ext (qw(.aux .bbl .blg .log .out .toc -blx.bib .bcf .run.xml))
+        {
+            if (-e $rootFilePath.$ext)
+            {
+                unlink($rootFilePath.$ext);
+            }
+        }
+    }
+
+}
+
 # Get commandline options
 GetOptions (
-	'p|pdf' => \$PDF,
-	'b|bib' => \$RUNBIB,
-	'x|xdvi' => \$RUNXAPP,
-	'e|evince' => \$RUNXAPP,
-	'h|help' => sub
+    'v|verbose' => \$verbosity,
+    'P|no-pdf' => sub { $PDF = 0 },
+    'b|bib' => \$RunBibtex,
+    'x|e|evince|viewer|xdvi' => \$RunViewer,
+    'C|no-clean' => sub { $clean = 0 },
+    'w|watch' => \$watcher,
+    # This is used by default, kept for compatibility reasons
+    'p|pdf' => sub { $PDF = 1},
+    'h|help' => sub
     {
-		print "latexb - LaTeX builder $Version\n\n";
-		print "Usage: $0 [OPTIONS] filename.tex\n\n";
-		PrintHelp('-b', '--bib', 'Run through bibtex. Only needed once, latexb will autodetect it afterwards');
-		PrintHelp('-p', '--pdf', 'Use pdflatex instead of latex');
-		PrintHelp('-x', '--xdvi', 'Run xdvi on the resulting *.dvi');
-		PrintHelp('-e', '--evince', 'Run evince on the resulting *.pdf');
-		PrintHelp('-h', '--help', 'Display this help screen');
-		print "\nIf --evince is supplied when building a dvi it acts as an alias for -x\n";
-		print "If --xdvi is supplied when building a pdf it acts as an alias for -e\n";
-		exit(0);
-	},
+        print "latexb - LaTeX builder $Version\n\n";
+        print "Usage: $0 [OPTIONS] filename.tex\n\n";
+        PrintHelp('-b', '--bib', 'Run through bibtex or bieber. latexb will usually autodetect this, rendering this option unneccessary.');
+        PrintHelp('-P', '---pdf', 'Use latex instead of pdflatex (generate a *.dvi)');
+        PrintHelp('-x', '--viewer', 'Run a viewer (evince, xdvi) on the generated file');
+        PrintHelp('-h', '--help', 'Display this help screen');
+        print "\nIf --evince is supplied when building a dvi it acts as an alias for -x\n";
+        print "If --xdvi is supplied when building a pdf it acts as an alias for -e\n";
+        exit(0);
+    },
 ) or die("See $0 --help for more information\n");
 
 die("Requires one option: the file to build\n") if not @ARGV;
 
-foreach my $CurrentFile (@ARGV)
+if ($watcher)
 {
-	buildFile($CurrentFile);
+    if (scalar(@ARGV) > 1)
+    {
+        die('Watch can only operate on a single file'."\n");
+    }
+    my $file = resolvePath(shift(@ARGV));
+    if (!InPath('inotifywait'))
+    {
+        die('Watch requires the inotifywait program to be installed'."\n");
+    }
+    my @inotifyCommand = qw{inotifywait -q -q};
+    while(1)
+    {
+        print 'Watching '.$file.' for changes...'."\n";
+        if(system(@inotifyCommand,$file) != 0)
+        {
+            exit(0);
+        }
+        while(!-e $file)
+        {
+            sleep(0.2);
+        }
+        try
+        {
+            buildFile($file);
+        }
+        catch
+        {
+            warn($_);
+        };
+        print "\n";
+    }
+}
+else
+{
+    foreach my $CurrentFile (@ARGV)
+    {
+        buildFile($CurrentFile);
+    }
 }
