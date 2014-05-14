@@ -32,6 +32,9 @@ SEARCHPATH="$PATH"
 INSTALLDIR="$HOME/.local/share/git-annex"
 # The target for the .desktop file
 DESKTOPDIR="$HOME/.local/share/applications"
+# The default target for the manpages. This will only be used if
+# there are no writable directories already in MANPATH
+MANDIR="$HOME/.local/share/man"
 # Install globally to /usr/local if running as root
 if [ "$(id -ru)" = "0" ]; then
     INSTALLDIR="/usr/local/git-annex"
@@ -43,7 +46,7 @@ VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
 # Store the gitannex-install version in this file
 META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
 # gitannex-install meta version
-METAVERSION=2
+METAVERSION=3
 # The mode we're running in
 MODE="upgrade"
 UNAME_M="$(uname -m)"
@@ -293,6 +296,22 @@ __EOF__
     fi
 done
 printf "%s" "."
+# Find a writable path in the MANPATH. If none is found we use the default
+# MANDIR set earlier.
+if which manpath >/dev/null 2>&1; then
+    for dir in $(manpath 2>/dev/null); do
+        if [ -w "$dir" ]; then
+            MANDIR="$dir"
+            break
+        fi
+    done
+fi
+# Write the manpages if possible
+if [ "$MANDIR" != "" ]; then
+    mkdir -p "$MANDIR/man1"
+    ln -s "$INSTALLDIR/usr/share/man/man1/git-annex.1" "$MANDIR/man1/"
+    ln -s "$INSTALLDIR/usr/share/man/man1/git-annex-shell.1" "$MANDIR/man1/"
+fi
 # Create a desktop-file
 if [ -e "$INSTALLDIR/logo.svg" ]; then
     mkdir -p "$DESKTOPDIR"
@@ -323,10 +342,12 @@ printf "%s" "."
 printf "%s" "."
 [ -e "$INSTALLDIR/.git-annex-shell-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-shell-wrapper"\`"
 printf "%s" "."
+rm -f "$MANDIR/git-annex.1"
+rm -f "$MANDIR/git-annex-shell.1"
+printf "%s" "."
 [ -e "$INSTALLDIR/runshell" ] && rm -rf "$INSTALLDIR"
 printf "%s" "."
 [ -e "$DESKTOPDIR/git-annex-gitannexinstall.desktop" ] && rm -f ""$DESKTOPDIR/git-annex-gitannexinstall.desktop"
-printf "%s" "."
 echo "done"
 __EOF__
 chmod 700 "$INSTALLDIR/uninstall"
