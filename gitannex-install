@@ -137,7 +137,7 @@ fi
 CURRENT_VERSION="$( catFile "$VERSIONFILE" )"
 if [ -x "$INSTALLDIR/runshell" ]; then
     if [ "$DAILY" = "0" ]; then
-        CURRENT_VERSION_GA="$( $INSTALLDIR/runshell git-annex version|head -n1 | sed -e 's/.*:\s*//;s/-.*//')"
+        CURRENT_VERSION_GA="$( $INSTALLDIR/runshell git-annex version 2>/dev/null |head -n1 | sed -e 's/.*:\s*//;s/-.*//')"
     else
         CURRENT_VERSION_GA="-"
     fi
