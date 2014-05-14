@@ -267,11 +267,23 @@ for pathDir in $SEARCHPATH; do
             FOUND_DIR="$pathDir"
             printf "%s" "."
             # Write the wrapper script
+            if [ -e "/usr/lib/arm-linux-gnueabihf/libcofi_rpi.so" ]; then
+                # Write a raspberry pi-specific wrapper script that unsets LD_PRELOAD
+            cat << __EOF__ > "$pathDir/$file"
+#!/bin/sh
+# Installed by gitannex-install
+LD_PRELOAD=""
+export LD_PRELOAD
+exec "$INSTALLDIR/runshell" "$file" "\$@"
+__EOF__
+            else
+                # Write the normal wrapper script
             cat << __EOF__ > "$pathDir/$file"
 #!/bin/sh
 # Installed by gitannex-install
 exec "$INSTALLDIR/runshell" "$file" "\$@"
 __EOF__
+            fi
             chmod 755 "$pathDir/$file"
             # Link the wrapper script into the install directory, so that the uninstall
             # script knows where to look for it
