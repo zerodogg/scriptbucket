@@ -347,7 +347,7 @@ rm -f "$MANDIR/git-annex-shell.1"
 printf "%s" "."
 [ -e "$INSTALLDIR/runshell" ] && rm -rf "$INSTALLDIR"
 printf "%s" "."
-[ -e "$DESKTOPDIR/git-annex-gitannexinstall.desktop" ] && rm -f ""$DESKTOPDIR/git-annex-gitannexinstall.desktop"
+[ -e "$DESKTOPDIR/git-annex-gitannexinstall.desktop" ] && rm -f "$DESKTOPDIR/git-annex-gitannexinstall.desktop"
 echo "done"
 __EOF__
 chmod 700 "$INSTALLDIR/uninstall"
