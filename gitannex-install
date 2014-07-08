@@ -46,7 +46,7 @@ VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
 # Store the gitannex-install version in this file
 META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
 # gitannex-install meta version
-METAVERSION=3
+METAVERSION=4
 # The mode we're running in
 MODE="upgrade"
 UNAME_M="$(uname -m)"
@@ -342,8 +342,8 @@ printf "%s" "."
 printf "%s" "."
 [ -e "$INSTALLDIR/.git-annex-shell-wrapper" ] && rm -f "\`readlink "$INSTALLDIR/.git-annex-shell-wrapper"\`"
 printf "%s" "."
-rm -f "$MANDIR/git-annex.1"
-rm -f "$MANDIR/git-annex-shell.1"
+rm -f "$MANDIR/man1/git-annex.1"
+rm -f "$MANDIR/man1/git-annex-shell.1"
 printf "%s" "."
 [ -e "$INSTALLDIR/runshell" ] && rm -rf "$INSTALLDIR"
 printf "%s" "."
