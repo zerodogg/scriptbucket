@@ -238,62 +238,83 @@ printf "%s" "."
 # Find a directory in the SEARCHPATH (PATH) that is writeable
 IFS=":"
 FOUND_DIR=0
-for pathDir in $SEARCHPATH; do
-    if [ "$pathDir" = "---" ]; then
-        echo ""
-        echo "WARNING: Failed to find a writable directory in the PATH for"
-        echo "non-interactive shells. git-annex may not work over ssh."
-        echo "This could be because you don't have any directory in the PATH for"
-        echo "non-interactive shells that this script can write to."
-        echo "Your non-interactive PATH is: $NONINTERACTIVE_SEARCHPATH"
-        printf "%s" "Continuing..."
+pathDir=""
+# First we try to use one of the standard paths. This is so that we don't write
+# into some other user-specific path, such as rvm, perl local::lib or similar
+for check in $SEARCHPATH; do
+    if [ "$check" = "$HOME/bin" ] || [ "$check" = "$HOME/.bin" ] || [ "$check" = "$HOME/.local/bin" ]; then
+        if [ -w "$check" ]; then
+            pathDir="$check"
+            break
+        fi
     fi
-    if [ -w "$pathDir" ]; then
-        # Write a wrapper script for git-annex and git-annex-shell into
-        # the path
-        for file in git-annex git-annex-shell; do
-            if [ -e "$pathDir/$file" ]; then
-                # If the file exists and the user wants to --overwrite, just remove it
-                if [ "$OVERWRITE" = "1" ]; then
-                    rm -f "$pathDir/$file"
-                # Check if the file was written by this script, if it wasn't then
-                # skip it with a warning.
-                elif ! grep -q 'Installed by gitannex-install' "$pathDir/$file"; then
-                    echo ""
-                    echo "WARNING: $pathDir/$file: already exists - skipped"
-                    echo "You may want to manually remove this file and then re-run this script."
-                    echo "(or re-run gitannex-install with --force --overwrite)"
-                    continue
-                fi
+    if [ "$check" = "---" ]; then
+        break
+    fi
+done
+# If none of the standard paths listed above could be found within the NONINTERACTIVE_SEARCHPATH
+if [ "$pathDir" = "" ]; then
+    for check in $SEARCHPATH; do
+        if [ -w "$check" ]; then
+            pathDir="$check"
+            break
+        fi
+        if [ "$check" = "---" ]; then
+            echo ""
+            echo "WARNING: Failed to find a writable directory in the PATH for"
+            echo "non-interactive shells. git-annex may not work over ssh."
+            echo "This could be because you don't have any directory in the PATH for"
+            echo "non-interactive shells that this script can write to."
+            echo "Your non-interactive PATH is: $NONINTERACTIVE_SEARCHPATH"
+            printf "%s" "Continuing..."
+        fi
+    done
+fi
+if [ "$pathDir" != "" ] && [ -w "$pathDir" ]; then
+    # Write a wrapper script for git-annex and git-annex-shell into
+    # the path
+    for file in git-annex git-annex-shell; do
+        if [ -e "$pathDir/$file" ]; then
+            # If the file exists and the user wants to --overwrite, just remove it
+            if [ "$OVERWRITE" = "1" ]; then
+                rm -f "$pathDir/$file"
+            # Check if the file was written by this script, if it wasn't then
+            # skip it with a warning.
+            elif ! grep -q 'Installed by gitannex-install' "$pathDir/$file"; then
+                echo ""
+                echo "WARNING: $pathDir/$file: already exists - skipped"
+                echo "You may want to manually remove this file and then re-run this script."
+                echo "(or re-run gitannex-install with --force --overwrite)"
+                continue
             fi
-            FOUND_DIR="$pathDir"
-            printf "%s" "."
-            # Write the wrapper script
-            if [ -e "/usr/lib/arm-linux-gnueabihf/libcofi_rpi.so" ]; then
-                # Write a raspberry pi-specific wrapper script that unsets LD_PRELOAD
-            cat << __EOF__ > "$pathDir/$file"
+        fi
+        FOUND_DIR="$pathDir"
+        printf "%s" "."
+        # Write the wrapper script
+        if [ -e "/usr/lib/arm-linux-gnueabihf/libcofi_rpi.so" ]; then
+            # Write a raspberry pi-specific wrapper script that unsets LD_PRELOAD
+        cat << __EOF__ > "$pathDir/$file"
 #!/bin/sh
 # Installed by gitannex-install
 LD_PRELOAD=""
 export LD_PRELOAD
 exec "$INSTALLDIR/runshell" "$file" "\$@"
 __EOF__
-            else
-                # Write the normal wrapper script
-            cat << __EOF__ > "$pathDir/$file"
+        else
+            # Write the normal wrapper script
+        cat << __EOF__ > "$pathDir/$file"
 #!/bin/sh
 # Installed by gitannex-install
 exec "$INSTALLDIR/runshell" "$file" "\$@"
 __EOF__
-            fi
-            chmod 755 "$pathDir/$file"
-            # Link the wrapper script into the install directory, so that the uninstall
-            # script knows where to look for it
-            ln -s "$pathDir/$file" "$INSTALLDIR/.$file-wrapper"
-        done
-        break
-    fi
-done
+        fi
+        chmod 755 "$pathDir/$file"
+        # Link the wrapper script into the install directory, so that the uninstall
+        # script knows where to look for it
+        ln -s "$pathDir/$file" "$INSTALLDIR/.$file-wrapper"
+    done
+    break
+fi
 printf "%s" "."
 # Find a writable path in the MANPATH. If none is found we use the default
 # MANDIR set earlier.
