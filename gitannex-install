@@ -46,18 +46,17 @@ VERSIONFILE="$INSTALLDIR/.gitannex-install-currentversion"
 # Store the gitannex-install version in this file
 META_VERSIONFILE="$INSTALLDIR/.gitannex-install-metaversion"
 # gitannex-install meta version
-METAVERSION=4
+METAVERSION=5
 # The mode we're running in
 MODE="upgrade"
 UNAME_M="$(uname -m)"
 # The URL to download from (will be different for --daily)
-if [ "$UNAME_M" = "x86_64" ]; then
-    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz"
-elif [ "$UNAME_M" = "armel" ] || [ "$UNAME_M" = "armv6l" ]; then
-    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-armel.tar.gz"
-else
-    GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz"
-fi
+case $UNAME_M in
+    'x86_64') GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-amd64.tar.gz" ;;
+    arm*l) GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-armel.tar.gz" ;;
+    i*86) GET_URL="http://downloads.kitenet.net/git-annex/linux/current/git-annex-standalone-i386.tar.gz" ;;
+    *) echo "ERROR: Unhandled architecture: $UNAME_M"; exit 1;;
+esac
 # 1 if the user wants to force an install
 FORCE=0
 # 1 if the user wants to force-overwrite files
